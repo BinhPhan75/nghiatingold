@@ -53,25 +53,60 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
+    // Check for "mock" user in session storage for persistence on refresh if manual login used
+    const savedUser = sessionStorage.getItem('mockUser');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async () => {
+    setLoginError('');
+    // Check manual login first
+    if (username === 'admin' && password === '1234') {
+      const mockUser = {
+        uid: 'admin-id',
+        displayName: 'Quản Trị Viên',
+        email: 'admin@kimhoan.pro',
+        photoURL: 'https://picsum.photos/seed/admin/200'
+      };
+      setUser(mockUser);
+      sessionStorage.setItem('mockUser', JSON.stringify(mockUser));
+      return;
+    }
+
+    if (username || password) {
+      setLoginError('Sai tài khoản hoặc mật khẩu');
+      return;
+    }
+
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Login failed:", error);
+      setLoginError('Đăng nhập Google thất bại');
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    signOut(auth);
+    setUser(null);
+    sessionStorage.removeItem('mockUser');
+  };
 
   useEffect(() => {
     const seedData = async () => {
@@ -104,7 +139,7 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="p-12 max-w-2xl w-full text-center space-y-12"
+          className="p-12 max-w-lg w-full text-center space-y-12"
         >
           <div className="space-y-4">
             <h1 className="text-9xl font-black text-white tracking-[-0.08em] leading-none uppercase">
@@ -112,14 +147,59 @@ export default function App() {
             </h1>
             <p className="text-white/40 uppercase tracking-[0.4em] text-xs font-bold font-serif italic">Kim Hoàn Pro Management</p>
           </div>
-          
-          <button 
-            onClick={handleLogin}
-            className="w-full bg-gold-primary py-6 rounded-none text-ink font-black text-xl uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-4"
-          >
-            <UserIcon size={24} />
-            LOGIN TO SYSTEM
-          </button>
+
+          <div className="space-y-6 text-left">
+            <div className="space-y-4">
+               <div className="space-y-2">
+                 <label className="text-[10px] uppercase font-black text-white/20 tracking-widest">Tài khoản</label>
+                 <input 
+                   type="text" 
+                   value={username}
+                   onChange={(e) => setUsername(e.target.value)}
+                   placeholder="ADMIN"
+                   className="w-full bg-white/5 border border-white/10 p-5 font-black uppercase text-sm tracking-widest outline-none focus:border-gold-primary transition-all text-white"
+                 />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[10px] uppercase font-black text-white/20 tracking-widest">Mật khẩu</label>
+                 <input 
+                   type="password" 
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                   placeholder="••••"
+                   className="w-full bg-white/5 border border-white/10 p-5 font-black text-sm tracking-widest outline-none focus:border-gold-primary transition-all text-white"
+                 />
+               </div>
+            </div>
+
+            {loginError && (
+              <p className="text-red-500 text-[10px] font-black uppercase tracking-widest text-center">{loginError}</p>
+            )}
+            
+            <button 
+              onClick={handleLogin}
+              className="w-full bg-gold-primary py-6 rounded-none text-ink font-black text-xl uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-4"
+            >
+              <UserIcon size={24} />
+              LOGIN TO SYSTEM
+            </button>
+
+            <div className="relative pt-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/5"></div>
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
+                <span className="bg-ink px-4 text-white/20">Hoặc tiếp tục với</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => { setUsername(''); setPassword(''); handleLogin(); }}
+              className="w-full border border-white/10 py-6 rounded-none text-white/40 font-black text-sm uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-4"
+            >
+              Sign in with Google
+            </button>
+          </div>
         </motion.div>
       </div>
     );
@@ -154,7 +234,13 @@ export default function App() {
         </div>
 
         <div className="flex flex-col gap-6 items-center">
-          <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-none border border-gold-primary/30" />
+          {user.photoURL ? (
+            <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-none border border-gold-primary/30" />
+          ) : (
+            <div className="w-10 h-10 border border-gold-primary/30 flex items-center justify-center text-gold-primary font-black uppercase text-xs">
+              {user.displayName?.charAt(0) || 'A'}
+            </div>
+          )}
           <button 
             onClick={handleLogout}
             className="text-white/20 hover:text-red-500 transition-colors"
