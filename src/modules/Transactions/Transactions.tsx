@@ -21,8 +21,6 @@ const Transactions: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  const [customerBank, setCustomerBank] = useState('970436'); // Default VCB
-  const [customerAccount, setCustomerAccount] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [cashAmount, setCashAmount] = useState<number>(0);
@@ -167,7 +165,6 @@ const Transactions: React.FC = () => {
     setCustomerName('');
     setCustomerCCCD('');
     setCustomerAddress('');
-    setCustomerAccount('');
     setQuantity(1);
     setCashAmount(0);
     setTransferAmount(0);
@@ -259,32 +256,6 @@ const Transactions: React.FC = () => {
               />
             </div>
           </div>
-
-          {type === 'BUY' && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="input-field">
-                <label>Ngân hàng khách</label>
-                <select value={customerBank} onChange={(e) => setCustomerBank(e.target.value)}>
-                  <option value="970436">Vietcombank</option>
-                  <option value="970415">VietinBank</option>
-                  <option value="970418">BIDV</option>
-                  <option value="970405">Agribank</option>
-                  <option value="970422">MB Bank</option>
-                  <option value="970423">TPBank</option>
-                  <option value="970441">VIB</option>
-                </select>
-              </div>
-              <div className="input-field">
-                <label>Số tài khoản khách</label>
-                <input 
-                  type="text" 
-                  value={customerAccount} 
-                  onChange={(e) => setCustomerAccount(e.target.value)} 
-                  placeholder="Để tự động điền vào app" 
-                />
-              </div>
-            </div>
-          )}
 
           <div className="input-field">
             <label>Địa chỉ</label>
