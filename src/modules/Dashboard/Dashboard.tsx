@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Transaction, Product } from '../../types';
 import { 
@@ -10,6 +11,7 @@ import { formatCurrency } from '../../lib/utils';
 import { motion } from 'motion/react';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     buyTotal: 0,
     sellTotal: 0,
@@ -72,12 +74,30 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-        <div>
-          <h1 className="text-4xl text-ink">Tổng Quan</h1>
-          <p className="text-[10px] uppercase font-black text-neutral-400 tracking-widest mt-2 px-1">Số liệu trực tiếp ngày hôm nay</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="flex flex-col md:flex-row md:items-end gap-6 w-full">
+          <div>
+            <h1 className="text-4xl text-ink">Tổng Quan</h1>
+            <p className="text-[10px] uppercase font-black text-neutral-400 tracking-widest mt-2 px-1">Số liệu trực tiếp ngày hôm nay</p>
+          </div>
+          
+          <div className="flex gap-2 w-full md:w-auto">
+            <button 
+              onClick={() => navigate('/transactions?type=BUY')}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-paper border border-ink py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:border-gold-primary hover:text-ink transition-all"
+            >
+              <TrendingDown size={14} className="text-red-500" /> Mua vào
+            </button>
+            <button 
+              onClick={() => navigate('/transactions?type=SELL')}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-ink text-paper py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all"
+            >
+              <TrendingUp size={14} className="text-green-400" /> Bán ra
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 bg-paper px-4 py-2 rounded-sm border border-neutral-100 shadow-sm">
+
+        <div className="hidden md:flex items-center gap-2 bg-paper px-4 py-2 rounded-sm border border-neutral-100 shadow-sm shrink-0">
           <Clock className="text-gold-primary" size={16} />
           <span className="text-xs font-bold text-neutral-500">{new Date().toLocaleDateString('vi-VN')}</span>
         </div>

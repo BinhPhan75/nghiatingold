@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,7 +10,9 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
   const { profile } = useAuth();
-  const [type, setType] = useState<'BUY' | 'SELL'>('SELL');
+  const [searchParams] = useSearchParams();
+  const initialType = searchParams.get('type') === 'BUY' ? 'BUY' : 'SELL';
+  const [type, setType] = useState<'BUY' | 'SELL'>(initialType);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [config, setConfig] = useState<SystemConfig | null>(null);
