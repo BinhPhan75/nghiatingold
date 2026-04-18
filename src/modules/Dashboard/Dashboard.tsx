@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
               <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 group-hover:rotate-0 transition-transform">
                 <Scale size={120} />
               </div>
-              <p className="text-[10px] uppercase font-black text-gold-primary tracking-[0.3em] mb-4">Kim Hoàn Pro</p>
+              <p className="text-[10px] uppercase font-black text-gold-primary tracking-[0.3em] mb-4">NGHIATIN GOLD</p>
               <h4 className="text-2xl mb-4 leading-tight italic">Hệ thống quản lý vàng bạc hiện đại nhất.</h4>
               <button 
                 className="bg-gold-primary text-ink py-2 px-8 font-black uppercase text-[10px] tracking-widest hover:bg-paper transition-all"

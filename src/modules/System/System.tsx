@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product, SystemConfig, Profile, UserRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload } from 'lucide-react';
+import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
@@ -22,6 +22,8 @@ const System: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
 
   useEffect(() => {
     fetchProducts();
@@ -53,6 +55,34 @@ const System: React.FC = () => {
     if (!error) fetchProducts();
   };
 
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProduct.name || !newProduct.unit) return;
+
+    const { error } = await supabase
+      .from('products')
+      .insert([newProduct]);
+
+    if (!error) {
+      fetchProducts();
+      setShowAddProduct(false);
+      setNewProduct({ name: '', unit: '', buy_price: 0, sell_price: 0 });
+    } else {
+      alert("Lỗi khi thêm mặt hàng");
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa mặt hàng này?")) return;
+
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+
+    if (!error) fetchProducts();
+  };
+
   const handleUpdateConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config) return;
@@ -76,7 +106,7 @@ const System: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `kim-hoan-pro-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `nghiatin-gold-backup-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
   };
 
@@ -103,10 +133,72 @@ const System: React.FC = () => {
       <div className="bg-paper p-8 rounded-sm shadow-sm border border-neutral-100 min-h-[500px]">
         {activeTab === 'prices' && (
           <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-3 border-b border-neutral-100 pb-4 mb-4">
-              <Tag className="text-gold-primary" />
-              <h3 className="text-xl">Điều chỉnh giá niêm yết</h3>
+            <div className="flex justify-between items-center border-b border-neutral-100 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <Tag className="text-gold-primary" />
+                <h3 className="text-xl">Điều chỉnh giá niêm yết</h3>
+              </div>
+              {isAdmin && (
+                <button 
+                  onClick={() => setShowAddProduct(true)}
+                  className="flex items-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-2 px-4 hover:bg-gold-primary hover:text-ink transition-all"
+                >
+                  <Plus size={16} /> Thêm mặt hàng
+                </button>
+              )}
             </div>
+
+            {showAddProduct && (
+              <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Thêm mặt hàng mới</h4>
+                  <button onClick={() => setShowAddProduct(false)}><X size={18} /></button>
+                </div>
+                <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="input-field">
+                    <label>Tên mặt hàng</label>
+                    <input 
+                      type="text" 
+                      placeholder="VD: Vàng 9999" 
+                      value={newProduct.name}
+                      onChange={e => setNewProduct({...newProduct, name: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="input-field">
+                    <label>Đơn vị</label>
+                    <input 
+                      type="text" 
+                      placeholder="VD: Chỉ" 
+                      value={newProduct.unit}
+                      onChange={e => setNewProduct({...newProduct, unit: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="input-field">
+                    <label>Giá mua</label>
+                    <input 
+                      type="number" 
+                      value={newProduct.buy_price}
+                      onChange={e => setNewProduct({...newProduct, buy_price: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="input-field">
+                    <label>Giá bán</label>
+                    <input 
+                      type="number" 
+                      value={newProduct.sell_price}
+                      onChange={e => setNewProduct({...newProduct, sell_price: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="md:col-span-4 flex justify-end">
+                    <button type="submit" className="bg-ink text-paper py-2 px-8 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all">
+                      Xác nhận thêm
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
             
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -116,7 +208,7 @@ const System: React.FC = () => {
                     <th className="py-4 font-black uppercase text-[10px] tracking-widest italic text-neutral-400">Đơn vị</th>
                     <th className="py-4 font-black uppercase text-[10px] tracking-widest italic text-neutral-400">Giá mua vào</th>
                     <th className="py-4 font-black uppercase text-[10px] tracking-widest italic text-neutral-400">Giá bán ra</th>
-                    <th className="py-4 font-black uppercase text-[10px] tracking-widest italic text-neutral-400">Cập nhật</th>
+                    <th className="py-4 font-black uppercase text-[10px] tracking-widest italic text-neutral-400 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -127,7 +219,7 @@ const System: React.FC = () => {
                       <td className="py-4">
                         <input 
                           type="number" 
-                          className="w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
                           defaultValue={p.buy_price} 
                           onBlur={(e) => handleUpdatePrice(p.id, 'buy_price', Number(e.target.value))}
                         />
@@ -135,13 +227,26 @@ const System: React.FC = () => {
                       <td className="py-4">
                         <input 
                           type="number" 
-                          className="w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
                           defaultValue={p.sell_price} 
                           onBlur={(e) => handleUpdatePrice(p.id, 'sell_price', Number(e.target.value))}
                         />
                       </td>
-                      <td className="py-4 text-[10px] font-mono text-neutral-400">
-                        {new Date(p.updated_at).toLocaleString('vi-VN')}
+                      <td className="py-4 text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[9px] font-mono text-neutral-400 block">
+                            {new Date(p.updated_at).toLocaleString('vi-VN')}
+                          </span>
+                          {isAdmin && (
+                            <button 
+                              onClick={() => handleDeleteProduct(p.id)}
+                              className="text-red-400 hover:text-red-600 transition-colors"
+                              title="Xóa mặt hàng"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -119,14 +119,18 @@ const Reports: React.FC = () => {
 
       {/* Transactions Table */}
       <div className="bg-paper rounded-sm shadow-sm border border-neutral-100 overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center bg-neutral-50">
+        <div className="p-4 border-b flex justify-between items-center bg-neutral-50 px-4 md:px-6">
           <span className="text-[10px] font-black uppercase text-neutral-400 italic">Dữ liệu chi tiết: {transactions.length} giao dịch</span>
           <button className="flex items-center gap-2 text-[10px] font-black uppercase text-ink hover:text-gold-primary">
-            <Download size={14} /> Xuất CSV
+            <Download size={14} /> <span className="hidden sm:inline">Xuất CSV</span>
           </button>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="text-[10px] md:hidden px-4 py-2 bg-yellow-50 text-gold-dark border-b border-yellow-100 font-bold italic">
+          &larr; Vuốt sang trái/phải để xem đầy đủ bảng &rarr;
+        </div>
+
+        <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-ink text-paper">

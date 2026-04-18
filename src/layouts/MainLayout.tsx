@@ -14,20 +14,20 @@ const MainLayout: React.FC = () => {
   };
 
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['ADMIN', 'SALES'] },
-    { to: '/transactions', icon: ArrowLeftRight, label: 'Giao dịch', roles: ['ADMIN', 'SALES'] },
-    { to: '/reports', icon: FileBarChart, label: 'Báo cáo', roles: ['ADMIN', 'SALES', 'ACCOUNTANT'] },
-    { to: '/system', icon: Settings, label: 'Hệ thống', roles: ['ADMIN', 'SALES'] },
+    { to: '/', icon: LayoutDashboard, label: 'Home', roles: ['ADMIN', 'SALES'] },
+    { to: '/transactions', icon: ArrowLeftRight, label: 'GD', roles: ['ADMIN', 'SALES'] },
+    { to: '/reports', icon: FileBarChart, label: 'BC', roles: ['ADMIN', 'SALES', 'ACCOUNTANT'] },
+    { to: '/system', icon: Settings, label: 'HT', roles: ['ADMIN', 'SALES'] },
   ];
 
-  const filteredNavItems = navItems.filter(item => 
-    profile?.role && item.roles.includes(profile.role)
-  );
+  // Fix: Show menus even while profile is loading to prevent empty sidebar
+  const activeRole = profile?.role || 'SALES'; // Default to SALES during load or if missing
+  const filteredNavItems = navItems.filter(item => item.roles.includes(activeRole));
 
   return (
-    <div className="flex min-h-screen bg-ink overflow-hidden text-ink">
-      {/* Sidebar navigation */}
-      <nav className="w-20 md:w-24 border-r border-gold-primary/20 flex flex-col items-center py-8 gap-8 shrink-0">
+    <div className="flex flex-col md:flex-row min-h-screen bg-ink overflow-hidden text-ink">
+      {/* Desktop Sidebar navigation */}
+      <nav className="hidden md:flex w-24 border-r border-gold-primary/20 flex-col items-center py-8 gap-8 shrink-0">
         <div className="w-12 h-12 bg-gold-primary flex items-center justify-center rounded-sm mb-4">
           <Briefcase className="text-ink" size={24} />
         </div>
@@ -55,28 +55,51 @@ const MainLayout: React.FC = () => {
       </nav>
 
       {/* Main content area */}
-      <main className="flex-1 overflow-y-auto bg-gray-bg text-ink relative">
+      <main className="flex-1 flex flex-col min-w-0 bg-gray-bg relative overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 px-8 flex items-center justify-between bg-paper border-b border-neutral-100 shadow-sm sticky top-0 z-10">
+        <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-paper border-b border-neutral-100 shadow-sm shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl m-0 tracking-tight text-ink lowercase font-black">
-              Kim Hoàn <span className="text-gold-dark italic">Pro</span>
+            <h2 className="text-lg md:text-xl m-0 tracking-tight text-ink lowercase font-black">
+              NGHIATIN <span className="text-gold-dark italic">GOLD</span>
             </h2>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-[10px] uppercase font-black text-neutral-400 leading-none mb-1">Cửa hàng gold</p>
-              <p className="text-sm font-bold leading-none">{profile?.full_name}</p>
+              <p className="text-[9px] uppercase font-black text-neutral-400 leading-none mb-1">Store</p>
+              <p className="text-xs font-bold leading-none">{profile?.full_name || 'Đang tải...'}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-gold-primary/10 border border-gold-primary flex items-center justify-center font-black text-gold-dark">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gold-primary/10 border border-gold-primary flex items-center justify-center font-black text-gold-dark text-xs md:text-base">
               {profile?.full_name?.charAt(0) || 'U'}
             </div>
           </div>
         </header>
 
         {/* Dynamic Page Content */}
-        <div className="p-8 max-w-7xl mx-auto">
-          <Outlet />
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-7xl mx-auto pb-20 md:pb-0">
+            <Outlet />
+          </div>
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="md:hidden flex h-16 bg-ink border-t border-gold-primary/10 shrink-0">
+          {filteredNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `nav-item-mobile ${isActive ? 'active' : ''}`}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+          <button 
+            onClick={handleLogout}
+            className="nav-item-mobile text-red-500"
+          >
+            <LogOut size={20} />
+            <span>Thoát</span>
+          </button>
         </div>
       </main>
     </div>

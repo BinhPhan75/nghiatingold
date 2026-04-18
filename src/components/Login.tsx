@@ -58,7 +58,7 @@ const Login: React.FC = () => {
             <Briefcase className="text-ink" size={32} />
           </div>
           <h1 className="text-3xl text-ink">Đăng nhập</h1>
-          <p className="text-[10px] uppercase font-black text-neutral-400 tracking-[0.2em] mt-2">Hệ Thống Kim Hoàn Pro</p>
+          <p className="text-[10px] uppercase font-black text-neutral-400 tracking-[0.2em] mt-2">Hệ Thống NGHIATIN GOLD</p>
         </div>
 
         {error && (
@@ -114,7 +114,7 @@ const Login: React.FC = () => {
 
         <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
           <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
-            &copy; 2026 Kim Hoan Pro. All Rights Reserved.
+            &copy; 2026 NGHIATIN GOLD. All Rights Reserved.
           </p>
         </div>
       </motion.div>

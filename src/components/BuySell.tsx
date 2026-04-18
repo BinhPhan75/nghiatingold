@@ -102,7 +102,7 @@ export function BuySell() {
         const qr = generateVietQR(
           totalAmount,
           "0011000123456", // Mock Vietcombank Account
-          "CỬA HÀNG VÀNG KIM HOÀN PRO",
+          "CỬA HÀNG VÀNG NGHIATIN GOLD",
           `Thanh toan mua ${goldType} ${weight} ${unit}`
         );
         setQrUrl(qr);

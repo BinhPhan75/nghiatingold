@@ -18,7 +18,11 @@
     @apply bg-ink text-paper font-sans antialiased selection:bg-gold-primary selection:text-ink;
   }
   
-  h1, h2, h3, h4 {
+  h1 {
+    @apply font-black uppercase tracking-tighter leading-[0.9] text-3xl md:text-4xl lg:text-5xl;
+  }
+
+  h2, h3, h4 {
     @apply font-black uppercase tracking-tighter leading-[0.9];
   }
 }
@@ -73,7 +77,19 @@
 }
 
 .nav-item-bold {
-  @apply w-12 h-12 border border-gold-primary/30 flex items-center justify-center text-[8px] uppercase font-black tracking-tighter text-gold-primary transition-all hover:bg-gold-primary hover:text-ink;
+  @apply w-12 h-12 md:w-14 md:h-14 border border-gold-primary/30 flex items-center justify-center text-[8px] uppercase font-black tracking-tighter text-gold-primary transition-all hover:bg-gold-primary hover:text-ink;
+}
+
+.nav-item-mobile {
+  @apply flex flex-col items-center justify-center flex-1 py-1 text-gold-primary/60 transition-all;
+}
+
+.nav-item-mobile.active {
+  @apply text-gold-primary bg-white/5;
+}
+
+.nav-item-mobile span {
+  @apply text-[8px] uppercase font-black tracking-tighter mt-1;
 }
 
 .nav-item-bold.active {
