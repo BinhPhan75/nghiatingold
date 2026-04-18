@@ -22,6 +22,7 @@ export interface Transaction {
   type: 'BUY' | 'SELL';
   customer_name: string;
   customer_cccd: string;
+  dia_chi?: string;
   product_id: string;
   product_name: string;
   quantity: number;

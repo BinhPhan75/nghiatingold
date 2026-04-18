@@ -255,7 +255,12 @@ const Reports: React.FC = () => {
                         {t.type === 'BUY' ? 'Người bán (Khách)' : 'Người mua (Khách)'}
                       </div>
                       <div className="text-sm font-bold uppercase truncate max-w-[180px]">{t.customer_name}</div>
-                      <div className="text-[10px] font-mono text-neutral-400">{t.customer_cccd}</div>
+                      <div className="text-[10px] font-mono text-neutral-400 mb-1">{t.customer_cccd}</div>
+                      {t.dia_chi && (
+                        <div className="text-[9px] text-neutral-500 italic truncate max-w-[200px] leading-tight" title={t.dia_chi}>
+                          Đ/C: {t.dia_chi}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="font-bold italic text-ink text-sm">{t.product_name}</div>

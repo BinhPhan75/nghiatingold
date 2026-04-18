@@ -20,6 +20,7 @@ const Transactions: React.FC = () => {
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
@@ -70,6 +71,7 @@ const Transactions: React.FC = () => {
     if (typeof data === 'object' && data.id && data.name) {
       setCustomerName(data.name);
       setCustomerCCCD(data.id);
+      if (data.address) setCustomerAddress(data.address);
       setShowScanner(false);
       setLastError(null);
       return;
@@ -81,6 +83,7 @@ const Transactions: React.FC = () => {
       if (info) {
         setCustomerName(info.name);
         setCustomerCCCD(info.id);
+        if (info.address) setCustomerAddress(info.address);
         setShowScanner(false);
         setLastError(null);
       } else {
@@ -105,6 +108,7 @@ const Transactions: React.FC = () => {
       type,
       customer_name: customerName,
       customer_cccd: customerCCCD,
+      dia_chi: customerAddress,
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
       quantity,
@@ -144,6 +148,7 @@ const Transactions: React.FC = () => {
   const resetForm = () => {
     setCustomerName('');
     setCustomerCCCD('');
+    setCustomerAddress('');
     setQuantity(1);
     setSelectedProduct(null);
     setShowSuccess(false);
@@ -232,6 +237,16 @@ const Transactions: React.FC = () => {
                 placeholder="012345678912" 
               />
             </div>
+          </div>
+
+          <div className="input-field">
+            <label>Địa chỉ</label>
+            <input 
+              type="text" 
+              value={customerAddress} 
+              onChange={(e) => setCustomerAddress(e.target.value)} 
+              placeholder="Nơi thường trú" 
+            />
           </div>
 
           <div className="input-field">
