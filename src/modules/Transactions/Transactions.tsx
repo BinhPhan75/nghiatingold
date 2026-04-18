@@ -64,14 +64,23 @@ const Transactions: React.FC = () => {
   const handleScan = (data: string) => {
     if (!data) return;
     
+    console.log("Dữ liệu quét được:", data);
     const info = parseCCCD(data);
+    
     if (info) {
       setCustomerName(info.name);
       setCustomerCCCD(info.id);
       setShowScanner(false);
+      setLastError(null);
     } else {
-      console.warn("Mã QR không đúng định dạng CCCD:", data);
-      alert("Mã QR không đúng định dạng CCCD hoặc bị mờ. Vui lòng thử lại.");
+      console.warn("Mã QR không đúng định dạng CCCD chuẩn:", data);
+      // Give more specific feedback
+      const parts = data.split('|');
+      if (parts.length > 2) {
+        alert(`Dữ liệu quét được: "${data.substring(0, 30)}..." không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
+      } else {
+        alert("Không nhận diện được nội dung CCCD. Vui lòng đảm bảo bạn đang quét mã QR ở góc trên cùng bên phải của thẻ CCCD gắn chip.");
+      }
     }
   };
 
