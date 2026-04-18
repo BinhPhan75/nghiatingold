@@ -29,6 +29,8 @@ export interface Transaction {
   unit: string;
   price_per_unit: number;
   total_amount: number;
+  tien_mat: number;
+  chuyen_khoan: number;
   created_at: string;
   created_by: string;
   salesperson?: {

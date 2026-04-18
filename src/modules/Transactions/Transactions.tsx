@@ -5,7 +5,7 @@ import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
-import { parseCCCD, getVietQRUrl, getVCBDeepLink, formatCurrency, generateEMVCoQR } from '../../lib/utils';
+import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
@@ -25,10 +25,11 @@ const Transactions: React.FC = () => {
   const [customerAccount, setCustomerAccount] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
+  const [cashAmount, setCashAmount] = useState<number>(0);
+  const [transferAmount, setTransferAmount] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
 
@@ -64,6 +65,21 @@ const Transactions: React.FC = () => {
 
   const currentPrice = customPrice;
   const totalAmount = currentPrice * quantity;
+
+  useEffect(() => {
+    // Default: transferAmount = totalAmount, cashAmount = 0
+    setTransferAmount(totalAmount - cashAmount);
+  }, [totalAmount]);
+
+  const handleCashChange = (val: number) => {
+    setCashAmount(val);
+    setTransferAmount(Math.max(0, totalAmount - val));
+  };
+
+  const handleTransferChange = (val: number) => {
+    setTransferAmount(val);
+    setCashAmount(Math.max(0, totalAmount - val));
+  };
 
   const handleScan = (data: string | any) => {
     if (!data) return;
@@ -118,6 +134,8 @@ const Transactions: React.FC = () => {
       unit: selectedProduct.unit,
       price_per_unit: currentPrice,
       total_amount: totalAmount,
+      tien_mat: cashAmount,
+      chuyen_khoan: transferAmount,
       created_by: profile?.id,
     };
 
@@ -126,9 +144,10 @@ const Transactions: React.FC = () => {
 
     if (!error) {
       if (type === 'SELL') {
-        const desc = `${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`;
+        // Use removeVietnameseTones for unaccented memo as requested
+        const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`);
         if (config && config.bank_id && config.account_no && config.account_holder) {
-          const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, totalAmount, desc);
+          const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount || totalAmount, desc);
           setQrUrl(url);
           setShowQR(true);
         } else {
@@ -136,29 +155,7 @@ const Transactions: React.FC = () => {
         }
       } else {
         // Mode: BUY (Store buys from customer, Store pays customer)
-        const memo = `NGHIATIN TRA TIEN MUA VANG ${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`;
-        if (customerAccount) {
-          setIsPaying(true);
-          const deepLink = getVCBDeepLink(customerBank, customerAccount, totalAmount, memo);
-          
-          // Generate raw EMVCo for the most accurate fallback QR image
-          const emvco = generateEMVCoQR(customerBank, customerAccount, totalAmount, memo);
-          const imageUrl = `https://img.vietqr.io/image/${customerBank}-${customerAccount}-compact2.png?amount=${totalAmount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(customerName)}`;
-          
-          setQrUrl(imageUrl);
-          
-          // Direct redirection to preserve user gesture policy
-          window.location.href = deepLink;
-          
-          // Still show success/fallback pane in background
-          setTimeout(() => {
-            setIsPaying(false);
-            setShowSuccess(true);
-          }, 800);
-        } else {
-          window.location.href = `vietcombank://`; 
-          setShowSuccess(true);
-        }
+        setShowSuccess(true);
       }
     } else {
       setLastError(error);
@@ -172,6 +169,8 @@ const Transactions: React.FC = () => {
     setCustomerAddress('');
     setCustomerAccount('');
     setQuantity(1);
+    setCashAmount(0);
+    setTransferAmount(0);
     setSelectedProduct(null);
     setShowSuccess(false);
     setShowQR(false);
@@ -334,6 +333,27 @@ const Transactions: React.FC = () => {
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed border-neutral-200">
+            <div className="input-field">
+              <label className="text-vcb-green font-bold uppercase text-[9px]">Chuyển khoản (VND)</label>
+              <input 
+                type="number"
+                value={transferAmount}
+                className="bg-vcb-blue/5 border-vcb-blue/20"
+                onChange={(e) => handleTransferChange(Number(e.target.value))}
+              />
+            </div>
+            <div className="input-field">
+              <label className="text-orange-600 font-bold uppercase text-[9px]">Tiền mặt (VND)</label>
+              <input 
+                type="number"
+                value={cashAmount}
+                className="bg-orange-50 border-orange-200"
+                onChange={(e) => handleCashChange(Number(e.target.value))}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 pt-6 border-t border-neutral-100">
@@ -349,7 +369,7 @@ const Transactions: React.FC = () => {
             {type === 'SELL' ? (
               <><QrCode size={20} /> Tạo mã thanh toán QR</>
             ) : (
-              <><Send size={20} /> Thanh toán qua Vietcombank</>
+              <><CheckCircle2 size={20} /> Xác nhận & Lưu giao dịch</>
             )}
           </button>
         </div>
@@ -377,14 +397,14 @@ const Transactions: React.FC = () => {
               </div>
               
               <div className="w-full bg-neutral-50 p-4 rounded-sm border border-neutral-100 mb-6 text-left">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản</p>
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản (Không dấu)</p>
                 <div className="flex justify-between items-center gap-4">
                   <span className="font-mono font-bold text-sm text-ink break-all">
-                    {customerName} {customerCCCD} {selectedProduct?.name} x {quantity} {selectedProduct?.unit}
+                    {removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)}
                   </span>
                   <button 
                     onClick={() => {
-                      const desc = `${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`;
+                      const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`);
                       navigator.clipboard.writeText(desc);
                       alert("Đã sao chép nội dung!");
                     }}
@@ -402,28 +422,16 @@ const Transactions: React.FC = () => {
                   <p className="text-xs font-bold">{config?.account_holder}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tài khoản</p>
-                  <p className="text-xs font-bold">{config?.account_no}</p>
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền CK</p>
+                  <p className="text-xs font-bold">{formatCurrency(transferAmount || totalAmount)}</p>
                 </div>
               </div>
               
               <button 
                 onClick={resetForm} 
-                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg mb-3"
+                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
               >
                 Xác nhận đã nhận tiền
-              </button>
-
-              <button 
-                onClick={() => {
-                  if (config) {
-                    const desc = `${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`;
-                    window.location.href = getVCBDeepLink(config.bank_id, config.account_no, totalAmount, desc);
-                  }
-                }}
-                className="w-full py-3 bg-vcb-blue text-white font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-ink transition-all"
-              >
-                <Send size={14} /> Mở App Vietcombank
               </button>
             </motion.div>
           ) : showSuccess ? (
@@ -431,44 +439,26 @@ const Transactions: React.FC = () => {
               key="success"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white p-8 rounded-sm shadow-xl flex flex-col items-center text-center border-t-8 border-vcb-blue"
+              className="bg-white p-12 rounded-sm shadow-xl flex flex-col items-center text-center border-t-8 border-green-500"
             >
-              <div className="w-16 h-16 bg-vcb-blue/10 rounded-full flex items-center justify-center mb-6">
-                <CheckCircle2 size={32} className="text-vcb-blue" />
+              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 size={40} className="text-green-500" />
               </div>
-              <h3 className="text-2xl mb-2 italic">Giao dịch đã ghi nhận</h3>
-              <p className="text-xs text-neutral-500 mb-6 font-medium leading-relaxed">
-                Hệ thống đang mở App ngân hàng. Nếu không tự mở, vui lòng:
-                <br /><strong className="text-ink">Chụp màn hình QR bên dưới</strong> và chọn 
-                <br /><strong className="text-ink">"Quét QR từ ảnh"</strong> trong App ngân hàng.
+              <h3 className="text-2xl mb-2 italic">Giao dịch thành công</h3>
+              <p className="text-xs text-neutral-500 mb-8 font-medium leading-relaxed">
+                Hệ thống đã ghi nhận giao dịch của bạn.
+                <br />
+                <strong>Tiền mặt:</strong> {formatCurrency(cashAmount)}
+                <br />
+                <strong>Chuyển khoản:</strong> {formatCurrency(transferAmount)}
               </p>
               
-              <div className="bg-white p-2 border border-neutral-100 shadow-sm mb-6">
-                <img 
-                  src={qrUrl} 
-                  alt="VietQR Fallback" 
-                  className="w-56 h-auto" 
-                  referrerPolicy="no-referrer" 
-                />
-              </div>
-
-              <div className="flex flex-col gap-3 w-full">
-                <button 
-                  onClick={() => {
-                    const memo = `NGHIATIN GOLD - [MUA VANG] - ${customerName}`;
-                    window.location.href = getVCBDeepLink(customerBank, customerAccount, totalAmount, memo);
-                  }}
-                  className="w-full py-4 bg-vcb-blue text-white font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-ink transition-all shadow-md"
-                >
-                  <Send size={18} /> Thử mở lại App Ngân Hàng
-                </button>
-                <button 
-                  onClick={resetForm}
-                  className="w-full py-3 border border-neutral-200 text-neutral-400 font-black uppercase text-[10px] tracking-widest hover:border-ink hover:text-ink transition-all"
-                >
-                  Hoàn thành & Quay lại
-                </button>
-              </div>
+              <button 
+                onClick={resetForm}
+                className="w-full py-4 bg-ink text-white font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-md"
+              >
+                Tiếp tục giao dịch
+              </button>
             </motion.div>
           ) : (
             <motion.div 
@@ -490,22 +480,6 @@ const Transactions: React.FC = () => {
           onClose={() => setShowScanner(false)} 
         />
       )}
-
-      {/* Payment Loading Overlay */}
-      <AnimatePresence>
-        {isPaying && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-paper"
-          >
-            <div className="w-24 h-24 border-t-2 border-gold-primary rounded-full animate-spin mb-8"></div>
-            <h2 className="text-2xl italic mb-2">Đang kết nối...</h2>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-primary">Chuẩn bị mở App Vietcombank</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
       </div>
     </div>
   );

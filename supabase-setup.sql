@@ -34,6 +34,8 @@ create table if not exists transactions (
   unit text not null,
   price_per_unit numeric not null,
   total_amount numeric not null,
+  tien_mat numeric not null default 0,
+  chuyen_khoan numeric not null default 0,
   created_by uuid references public.profiles(id) on delete set null, -- Link to profiles for reporting
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
