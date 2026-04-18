@@ -71,9 +71,8 @@ create policy "Users can update their own profile" on profiles
   for update using (auth.uid() = id);
 
 create policy "Admins can manage all profiles" on profiles
-  using (
-    (exists (select 1 from profiles where id = auth.uid() and role = 'ADMIN'))
-    OR (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
+  for all using (
+    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
   );
 
 create policy "Products are viewable by all authenticated" on products
@@ -84,8 +83,7 @@ create policy "All users can update prices" on products
 
 create policy "Admins can manage products" on products
   for all using (
-    (exists (select 1 from profiles where id = auth.uid() and role = 'ADMIN'))
-    OR (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
+    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
   );
 
 create policy "Transactions are viewable/insertable by authenticated" on transactions
@@ -96,8 +94,7 @@ create policy "System config viewable by all" on system_config
 
 create policy "Admins can manage config" on system_config
   for all using (
-    (exists (select 1 from profiles where id = auth.uid() and role = 'ADMIN'))
-    OR (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
+    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
   );
 
 -- Function & Trigger
