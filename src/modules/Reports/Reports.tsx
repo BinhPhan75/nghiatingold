@@ -4,10 +4,17 @@ import { Transaction, Product } from '../../types';
 import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
+import { useAuth } from '../../contexts/AuthContext';
+
 const Reports: React.FC = () => {
+  const { profile, isAdmin, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastError, setLastError] = useState<any>(null);
+  const [dbStatus, setDbStatus] = useState<{ connected: boolean; message: string }>({ 
+    connected: true, message: '' 
+  });
 
   // Filter State
   const today = new Date().toISOString().split('T')[0];
@@ -19,7 +26,22 @@ const Reports: React.FC = () => {
   useEffect(() => {
     fetchProducts();
     fetchTransactions();
+    checkConnection();
   }, []);
+
+  const checkConnection = async () => {
+    try {
+      const { error } = await supabase.from('transactions').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      setDbStatus({ connected: true, message: '' });
+    } catch (err: any) {
+      setDbStatus({ 
+        connected: false, 
+        message: err.message || 'Không thể kết nối tới cơ sở dữ liệu.' 
+      });
+      setLastError(err);
+    }
+  };
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*');
@@ -38,12 +60,17 @@ const Reports: React.FC = () => {
     if (productId) query = query.eq('product_id', productId);
     if (customerCCCD) query = query.ilike('customer_cccd', `%${customerCCCD}%`);
 
-    const { data, error } = await query;
-
-    if (!error && data) {
-      setTransactions(data);
+    try {
+      const { data, error } = await query;
+      if (error) throw error;
+      setTransactions(data || []);
+      setLastError(null);
+    } catch (err: any) {
+      console.error("Fetch Transactions Error:", err);
+      setLastError(err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const totalBuy = transactions
@@ -54,8 +81,68 @@ const Reports: React.FC = () => {
     .filter(t => t.type === 'SELL')
     .reduce((sum, t) => sum + t.total_amount, 0);
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-20 italic text-neutral-400 font-bold">
+        Đang xác thực quyền hạn...
+      </div>
+    );
+  }
+
+  const currentUserEmail = profile?.email;
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Error & Diagnostic Panel */}
+      {lastError && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <Filter className="text-red-500 shrink-0 mt-1" size={24} />
+            <div className="flex-1">
+              <h3 className="text-red-800 font-black uppercase text-xs tracking-widest mb-2">Lỗi truy xuất dữ liệu</h3>
+              <p className="text-sm text-red-700 mb-4 font-medium">
+                {lastError.message || 'Có lỗi xảy ra khi tải báo cáo.'}
+              </p>
+              
+              {lastError.code === '42P01' ? (
+                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
+                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Nguyên nhân: Thiếu bảng giao dịch</p>
+                  <p className="text-xs text-red-700">Database của bạn chưa có bảng <strong>transactions</strong>. Vui lòng chạy script cài đặt trong mục Hệ Thống.</p>
+                </div>
+              ) : (lastError.code === 'PGRST301' || lastError.message?.includes('JWT')) ? (
+                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
+                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Nguyên nhân: Hết hạn phiên làm việc</p>
+                  <p className="text-xs text-red-700">Vui lòng đăng xuất và đăng nhập lại để làm mới quyền truy cập.</p>
+                </div>
+              ) : (lastError.message?.includes('permission denied') || !dbStatus.connected) && (
+                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
+                  <p className="font-bold text-xs text-red-800 uppercase mb-2 text-center py-2 bg-red-100 mb-3">Chẩn đoán lỗi RLS (Quyền truy cập)</p>
+                  <div className="space-y-3 text-[11px] text-red-900 leading-relaxed font-medium">
+                    <p>Hệ thống không thể đọc dữ liệu báo cáo. Điều này thường do <strong>Row Level Security (RLS)</strong> chưa được cấu hình cho tài khoản của bạn.</p>
+                    <div className="bg-white p-2 border border-red-200 font-mono text-[10px]">
+                      Email hiện tại: <span className="font-bold select-all underline text-blue-600">{currentUserEmail || 'n/a'}</span>
+                    </div>
+                    <p>Để khắc phục:</p>
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>Vào mục <strong>Hệ Thống</strong> &rarr; <strong>Kiểm Tra Kết Nối</strong></li>
+                      <li>Copy email ở trên dán vào file <strong>supabase-setup.sql</strong></li>
+                      <li>Chạy SQL script đó trong trang quản trị Supabase</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+              
+              <button 
+                onClick={() => { setLastError(null); fetchTransactions(); }}
+                className="text-[10px] font-black uppercase text-red-600 underline underline-offset-4"
+              >
+                Thử lại ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-end mb-4">
         <div>
           <h1 className="text-4xl text-ink">Báo Cáo</h1>
