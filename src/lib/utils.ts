@@ -90,7 +90,8 @@ export const removeVietnameseTones = (str: string) => {
 
 /**
  * Bank Deep Link / Universal Link Generator
- * Using api.vietqr.io redirection service for maximum mobile compatibility
+ * Using direct Universal Link format (https://qr.vietqr.io/VND/...) 
+ * This is more reliable for opening apps directly without browser redirects.
  */
 export const getVCBDeepLink = (
   bankId: string,
@@ -98,11 +99,12 @@ export const getVCBDeepLink = (
   amount: number,
   description: string
 ) => {
-  const bid = bankId || '970436'; // Default VCB
+  const bid = bankId || '970436'; // Default VCB BIN
   const memo = removeVietnameseTones(description);
   
-  // URL Format based on user request for api.vietqr.io v2 pay
-  return `https://api.vietqr.io/v2/pay?bank=${bid}&account=${accountNo}&amount=${amount}&memo=${encodeURIComponent(memo)}`;
+  // Format: https://qr.vietqr.io/VND/<BANK_BIN>/<ACC_NO>/<AMOUNT>/<DESC>
+  // This is a Universal Link that banking apps register to open directly
+  return `https://qr.vietqr.io/VND/${bid}/${accountNo}/${amount}/${encodeURIComponent(memo)}`;
 };
 
 export const formatCurrency = (amount: number) => {

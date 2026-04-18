@@ -144,12 +144,14 @@ const Transactions: React.FC = () => {
           
           setQrUrl(imageUrl);
           
-          // Small delay for better UX transition
+          // Direct redirection to preserve user gesture policy
+          window.location.href = deepLink;
+          
+          // Still show success/fallback pane in background
           setTimeout(() => {
-            window.location.href = deepLink;
             setIsPaying(false);
             setShowSuccess(true);
-          }, 1200);
+          }, 800);
         } else {
           window.location.href = `vietcombank://`; 
           setShowSuccess(true);
