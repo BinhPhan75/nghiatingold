@@ -25,34 +25,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Check active sessions and sets up the observer
+    let mounted = true;
+    let subscription: { unsubscribe: () => void } | null = null;
+
     const setupAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+        if (mounted) {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          }
         }
       } catch (err) {
         console.error("Auth initialization error:", err);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (mounted) {
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+          }
+          setLoading(false);
         }
-        setLoading(false);
       });
-
-      return () => subscription.unsubscribe();
+      subscription = data.subscription;
     };
 
     setupAuth();
+
+    return () => {
+      mounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProfile = async (uid: string) => {

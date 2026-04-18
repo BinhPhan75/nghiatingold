@@ -1,6 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+let instance: SupabaseClient | null = null;
+
 const getSupabase = (): SupabaseClient => {
+  if (instance) return instance;
+
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -8,15 +12,16 @@ const getSupabase = (): SupabaseClient => {
     throw new Error('Supabase configuration missing. Please provide VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment variables.');
   }
 
-  return createClient(url, key);
+  instance = createClient(url, key);
+  return instance;
 };
 
 // Lazy-initialized proxy to prevent crash on module load
 export const supabase = new Proxy({} as SupabaseClient, {
   get: (target, prop) => {
-    const instance = getSupabase();
-    const value = (instance as any)[prop];
-    return typeof value === 'function' ? value.bind(instance) : value;
+    const client = getSupabase();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
   }
 });
 
