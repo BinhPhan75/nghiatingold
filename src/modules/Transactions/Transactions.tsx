@@ -5,7 +5,7 @@ import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
-import { parseCCCD, getVietQRUrl, getVCBDeepLink, formatCurrency } from '../../lib/utils';
+import { parseCCCD, getVietQRUrl, getVCBDeepLink, formatCurrency, generateEMVCoQR } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
@@ -136,11 +136,14 @@ const Transactions: React.FC = () => {
         }
       } else {
         // Mode: BUY (Store buys from customer, Store pays customer)
-        const memo = `NGHIATIN GOLD - [MUA VANG] - ${customerName}`;
+        const memo = `NGHIATIN TRA TIEN MUA VANG ${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`;
         if (customerAccount) {
           setIsPaying(true);
           const deepLink = getVCBDeepLink(customerBank, customerAccount, totalAmount, memo);
-          const imageUrl = getVietQRUrl(customerBank, customerAccount, customerName, totalAmount, memo);
+          
+          // Generate raw EMVCo for the most accurate fallback QR image
+          const emvco = generateEMVCoQR(customerBank, customerAccount, totalAmount, memo);
+          const imageUrl = `https://img.vietqr.io/image/${customerBank}-${customerAccount}-compact2.png?amount=${totalAmount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(customerName)}`;
           
           setQrUrl(imageUrl);
           
@@ -434,7 +437,11 @@ const Transactions: React.FC = () => {
                 <CheckCircle2 size={32} className="text-vcb-blue" />
               </div>
               <h3 className="text-2xl mb-2 italic">Giao dịch đã ghi nhận</h3>
-              <p className="text-xs text-neutral-500 mb-6 font-medium">Hệ thống đã cố gắng mở App ngân hàng. Nếu App chưa mở, vui lòng quét mã bên dưới hoặc bấm nút mở App.</p>
+              <p className="text-xs text-neutral-500 mb-6 font-medium leading-relaxed">
+                Hệ thống đang mở App ngân hàng. Nếu không tự mở, vui lòng:
+                <br /><strong className="text-ink">Chụp màn hình QR bên dưới</strong> và chọn 
+                <br /><strong className="text-ink">"Quét QR từ ảnh"</strong> trong App ngân hàng.
+              </p>
               
               <div className="bg-white p-2 border border-neutral-100 shadow-sm mb-6">
                 <img 

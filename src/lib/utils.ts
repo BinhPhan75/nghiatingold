@@ -89,9 +89,68 @@ export const removeVietnameseTones = (str: string) => {
 };
 
 /**
+ * CRC16-CCITT (False) implementation for VietQR/EMVCo
+ */
+const crc16 = (str: string): string => {
+  let crc = 0xFFFF;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc = crc << 1;
+      }
+    }
+    crc &= 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+};
+
+const formatTag = (id: string, value: string): string => {
+  const len = value.length.toString().padStart(2, '0');
+  return `${id}${len}${value}`;
+};
+
+/**
+ * Generate standard EMVCo VietQR string (000201...)
+ */
+export const generateEMVCoQR = (
+  bankId: string,
+  accountNo: string,
+  amount: number,
+  description: string
+) => {
+  const bid = bankId || '970436';
+  const memo = removeVietnameseTones(description);
+
+  // Merchant Account Info (Tag 38)
+  const guid = formatTag('00', 'A000000727'); // Napas
+  const bankInfo = formatTag('01', bid);
+  const accNo = formatTag('02', accountNo);
+  const merchantAccount = formatTag('38', guid + bankInfo + accNo);
+
+  // Transaction Info
+  const payload = [
+    formatTag('00', '01'), // Payload Indicator
+    formatTag('01', '12'), // Point of Initiation: Dynamic
+    merchantAccount,
+    formatTag('53', '704'), // Currency: VND
+    formatTag('54', amount.toString()),
+    formatTag('58', 'VN'), // Country code
+    formatTag('62', formatTag('08', memo)), // Additional data (Memo)
+  ].join('');
+
+  const finalStr = payload + '6304';
+  const checksum = crc16(finalStr);
+  
+  return finalStr + checksum;
+};
+
+/**
  * Bank Deep Link / Universal Link Generator
- * Using direct Universal Link format (https://qr.vietqr.io/VND/...) 
- * This is more reliable for opening apps directly without browser redirects.
+ * Using direct Napas Universal Link (v2/pay) with EMVCo payload
+ * This is the gold standard for opening bank apps with pre-filled data.
  */
 export const getVCBDeepLink = (
   bankId: string,
@@ -99,12 +158,9 @@ export const getVCBDeepLink = (
   amount: number,
   description: string
 ) => {
-  const bid = bankId || '970436'; // Default VCB BIN
-  const memo = removeVietnameseTones(description);
-  
-  // Format: https://qr.vietqr.io/VND/<BANK_BIN>/<ACC_NO>/<AMOUNT>/<DESC>
-  // This is a Universal Link that banking apps register to open directly
-  return `https://qr.vietqr.io/VND/${bid}/${accountNo}/${amount}/${encodeURIComponent(memo)}`;
+  const emvco = generateEMVCoQR(bankId, accountNo, amount, description);
+  // Using qr.napas.com.vn Universal Link service for v2 payload redirection
+  return `https://qr.napas.com.vn/v2/pay?tag=00&data=${encodeURIComponent(emvco)}`;
 };
 
 export const formatCurrency = (amount: number) => {
