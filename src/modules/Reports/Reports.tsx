@@ -16,10 +16,16 @@ const Reports: React.FC = () => {
     connected: true, message: '' 
   });
 
-  // Filter State
-  const today = new Date().toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  // Filter State - Use local date for better UX in Vietnam (UTC+7)
+  const getLocalDate = () => {
+    const now = new Date();
+    const vnTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    return vnTime.toISOString().split('T')[0];
+  };
+
+  const localToday = getLocalDate();
+  const [startDate, setStartDate] = useState(localToday);
+  const [endDate, setEndDate] = useState(localToday);
   const [productId, setProductId] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
 
@@ -108,6 +114,19 @@ const Reports: React.FC = () => {
                 <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
                   <p className="font-bold text-xs text-red-800 uppercase mb-2">Nguyên nhân: Thiếu bảng giao dịch</p>
                   <p className="text-xs text-red-700">Database của bạn chưa có bảng <strong>transactions</strong>. Vui lòng chạy script cài đặt trong mục Hệ Thống.</p>
+                </div>
+              ) : lastError.message?.includes('relationship') ? (
+                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
+                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Lỗi quan hệ database (Relationship Error)</p>
+                  <p className="text-[11px] text-red-700 mb-3">PostgREST không tìm thấy liên kết giữa bảng giao dịch và thông tin nhân viên. Bạn cần chạy lệnh SQL sau để sửa:</p>
+                  <div className="bg-black text-[10px] p-3 font-mono text-green-400 select-all whitespace-pre overflow-x-auto">
+{`ALTER TABLE transactions 
+DROP CONSTRAINT IF EXISTS transactions_created_by_fkey;
+
+ALTER TABLE transactions 
+ADD CONSTRAINT transactions_created_by_fkey 
+FOREIGN KEY (created_by) REFERENCES profiles(id);`}
+                  </div>
                 </div>
               ) : (lastError.code === 'PGRST301' || lastError.message?.includes('JWT')) ? (
                 <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
@@ -221,12 +240,12 @@ const Reports: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-ink text-paper">
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">Ngày/Giờ</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">Thời gian</th>
                 <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">Loại GD</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Đối tác (Khách hàng)</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Chi tiết mặt hàng</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Nhân viên</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-right">Tổng thanh toán</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Khách hàng & Địa chỉ</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Mặt hàng</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Người thực hiện</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-right">Thành tiền</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">

@@ -92,15 +92,15 @@ const Dashboard: React.FC = () => {
           <div className="flex gap-2 w-full md:w-auto">
             <button 
               onClick={() => navigate('/transactions?type=BUY')}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-paper border border-ink py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:border-gold-primary hover:text-ink transition-all"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-neutral-200 py-2.5 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:border-gold-primary hover:text-ink transition-all shadow-sm"
             >
               <TrendingDown size={14} className="text-red-500" /> Mua vào
             </button>
             <button 
               onClick={() => navigate('/transactions?type=SELL')}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-ink text-paper py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gold-primary text-ink py-2.5 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-ink hover:text-white transition-all shadow-md"
             >
-              <TrendingUp size={14} className="text-green-400" /> Bán ra
+              <TrendingUp size={14} /> Bán ra
             </button>
           </div>
         </div>
@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
           count={stats.sellCount} 
           icon={TrendingUp} 
           color="text-vcb-blue" 
-          borderColor="border-vcb-blue"
+          borderColor="border-vcb-blue/20"
         />
         <StatCard 
           label="Tổng chi mua vào" 
@@ -127,7 +127,7 @@ const Dashboard: React.FC = () => {
           count={stats.buyCount} 
           icon={TrendingDown} 
           color="text-red-600" 
-          borderColor="border-red-600"
+          borderColor="border-red-600/20"
         />
         <StatCard 
           label="Chênh lệch dòng tiền" 
@@ -143,8 +143,63 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
+          <h3 className="mb-4 italic text-[11px] font-black uppercase text-red-600 flex items-center gap-2">
+            <TrendingDown size={14} /> Tỷ trọng mặt hàng MUA VÀO
+          </h3>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={buyPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {buyPieData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend verticalAlign="bottom" height={36} iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
+          <h3 className="mb-4 italic text-[11px] font-black uppercase text-vcb-blue flex items-center gap-2">
+            <TrendingUp size={14} /> Tỷ trọng mặt hàng BÁN RA
+          </h3>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={sellPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {sellPieData.map((_entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend verticalAlign="bottom" height={36} iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Real-time Prices Widget */}
         <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100 lg:col-span-1">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xl">Bảng giá niêm yết</h3>
@@ -177,7 +232,7 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 grid grid-cols-1 gap-8">
           {/* Main Sales Chart */}
           <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
-            <h3 className="mb-8 italic">Biểu đồ dòng tiền theo giờ</h3>
+            <h3 className="mb-8 italic text-xs font-black uppercase text-neutral-400">Biểu đồ dòng tiền theo giờ</h3>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hourlyData}>
@@ -192,58 +247,6 @@ const Dashboard: React.FC = () => {
                   <Bar dataKey="buy" name="Mua vào" fill="#dc2626" />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-             <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
-              <h3 className="mb-4 italic text-red-600">Tỷ trọng mặt hàng MUA VÀO</h3>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={buyPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {buyPieData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
-              <h3 className="mb-4 italic text-vcb-blue">Tỷ trọng mặt hàng BÁN RA</h3>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={sellPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {sellPieData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
             </div>
           </div>
         </div>

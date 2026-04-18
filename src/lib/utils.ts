@@ -54,24 +54,31 @@ export const getVietQRUrl = (
   amount: number, 
   description: string
 ) => {
-  // Use 'compact2' template to show account details and description on the image
+  // 970436 is the BIN for Vietcombank if not provided
+  const bid = bankId || '970436';
   const template = 'compact2'; 
   const encodedDesc = encodeURIComponent(description);
   const encodedName = encodeURIComponent(accountName);
   
-  // Adding size parameter (optional) for better clarity
-  return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodedDesc}&accountName=${encodedName}`;
+  return `https://img.vietqr.io/image/${bid}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodedDesc}&accountName=${encodedName}`;
 };
 
 /**
- * Bank Deep Link Generator (Vietcombank)
- * Note: Actual deep linking for VCB often requires specific SDK or web payment gateway.
- * For this app, we'll provide a formatted string for copy or a generic app open if possible.
+ * Bank Deep Link / Universal Link Generator
+ * Using VietQR standard Universal Link which most VN bank apps intercept
  */
-export const getVCBDeepLink = (description: string) => {
-  // Mobile app scheme for VCB (generalized)
-  // In many cases, it's just 'vietcombank://' to open the app.
-  return `vietcombank://`;
+export const getVCBDeepLink = (
+  bankId: string,
+  accountNo: string,
+  amount: number,
+  description: string
+) => {
+  const bid = bankId || '970436';
+  const encodedDesc = encodeURIComponent(description);
+  
+  // Format: https://qr.vietqr.io/VND/<BANK_BIN>/<ACC_NO>/<AMOUNT>/<DESC>
+  // This URL is standard and recognized by VCB Digibank and other apps
+  return `https://qr.vietqr.io/VND/${bid}/${accountNo}/${amount}/${encodedDesc}`;
 };
 
 export const formatCurrency = (amount: number) => {

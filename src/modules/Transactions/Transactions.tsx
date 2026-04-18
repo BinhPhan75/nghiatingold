@@ -21,6 +21,8 @@ const Transactions: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [customerBank, setCustomerBank] = useState('970436'); // Default VCB
+  const [customerAccount, setCustomerAccount] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
@@ -123,20 +125,22 @@ const Transactions: React.FC = () => {
 
     if (!error) {
       if (type === 'SELL') {
-        // Optimized description: Short and informative to avoid truncation in banking apps
-        const desc = `${customerCCCD} ${selectedProduct.name} x${quantity}`;
+        const desc = `${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`;
         if (config && config.bank_id && config.account_no && config.account_holder) {
           const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, totalAmount, desc);
           setQrUrl(url);
           setShowQR(true);
         } else {
-          alert("Lỗi: Thông tin ngân hàng chưa đầy đủ (Thiếu mã Bank, số tài khoản hoặc tên chủ tài khoản). Vui lòng kiểm tra lại trong mục Hệ Thống > Ngân Hàng.");
+          alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ.");
         }
       } else {
-        // Mode: BUY (Customer sells to us, we pay them)
-        const desc = `CHUYEN TIEN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name} CHO KH ${customerName} ${customerCCCD}`;
-        // Redirect to VCB app
-        window.location.href = getVCBDeepLink(desc);
+        // Mode: BUY (Store buys from customer, Store pays customer)
+        const desc = `THANH TOAN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name} CHO ${customerName}`;
+        if (customerAccount) {
+          window.location.href = getVCBDeepLink(customerBank, customerAccount, totalAmount, desc);
+        } else {
+          window.location.href = `vietcombank://`; // Fallback to just open app if no account
+        }
         setShowSuccess(true);
       }
     } else {
@@ -149,6 +153,7 @@ const Transactions: React.FC = () => {
     setCustomerName('');
     setCustomerCCCD('');
     setCustomerAddress('');
+    setCustomerAccount('');
     setQuantity(1);
     setSelectedProduct(null);
     setShowSuccess(false);
@@ -238,6 +243,32 @@ const Transactions: React.FC = () => {
               />
             </div>
           </div>
+
+          {type === 'BUY' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="input-field">
+                <label>Ngân hàng khách</label>
+                <select value={customerBank} onChange={(e) => setCustomerBank(e.target.value)}>
+                  <option value="970436">Vietcombank</option>
+                  <option value="970415">VietinBank</option>
+                  <option value="970418">BIDV</option>
+                  <option value="970405">Agribank</option>
+                  <option value="970422">MB Bank</option>
+                  <option value="970423">TPBank</option>
+                  <option value="970441">VIB</option>
+                </select>
+              </div>
+              <div className="input-field">
+                <label>Số tài khoản khách</label>
+                <input 
+                  type="text" 
+                  value={customerAccount} 
+                  onChange={(e) => setCustomerAccount(e.target.value)} 
+                  placeholder="Để tự động điền vào app" 
+                />
+              </div>
+            </div>
+          )}
 
           <div className="input-field">
             <label>Địa chỉ</label>
@@ -332,11 +363,12 @@ const Transactions: React.FC = () => {
                 <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản</p>
                 <div className="flex justify-between items-center gap-4">
                   <span className="font-mono font-bold text-sm text-ink break-all">
-                    {customerCCCD} {selectedProduct?.name} x{quantity}
+                    {customerName} {customerCCCD} {selectedProduct?.name} x {quantity} {selectedProduct?.unit}
                   </span>
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(`${customerCCCD} ${selectedProduct?.name} x${quantity}`);
+                      const desc = `${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`;
+                      navigator.clipboard.writeText(desc);
                       alert("Đã sao chép nội dung!");
                     }}
                     className="shrink-0 p-2 hover:bg-neutral-200 rounded-full transition-colors"
@@ -360,9 +392,21 @@ const Transactions: React.FC = () => {
               
               <button 
                 onClick={resetForm} 
-                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
+                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg mb-3"
               >
                 Xác nhận đã nhận tiền
+              </button>
+
+              <button 
+                onClick={() => {
+                  if (config) {
+                    const desc = `${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`;
+                    window.location.href = getVCBDeepLink(config.bank_id, config.account_no, totalAmount, desc);
+                  }
+                }}
+                className="w-full py-3 bg-vcb-blue text-white font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-ink transition-all"
+              >
+                <Send size={14} /> Mở App Vietcombank
               </button>
             </motion.div>
           ) : showSuccess ? (

@@ -12,8 +12,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [scannedResult, setScannedResult] = useState<string | null>(null);
-  const [aiResult, setAiResult] = useState<any | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [isScanningFile, setIsScanningFile] = useState(false);
@@ -35,7 +33,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           { facingMode: "environment" }, 
           config, 
           (decodedText) => {
-            setScannedResult(decodedText);
+            onScan(decodedText);
           },
           (errorMessage) => { }
         );
@@ -70,7 +68,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     
     setIsProcessing(true);
     try {
-      // Get the video element from html5-qrcode's internal structure or find it in DOM
       const video = document.querySelector('#reader video') as HTMLVideoElement;
       if (!video) throw new Error("Video element not found");
 
@@ -86,7 +83,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       // 1. Try QR first on this frame
       try {
         const qrResult = await scannerRef.current.scanFile(new File([await (await fetch(base64Image)).blob()], "capture.jpg"), true);
-        setScannedResult(qrResult);
+        onScan(qrResult);
         setIsProcessing(false);
         return;
       } catch (e) {
@@ -96,7 +93,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       // 2. AI Analysis
       const info = await analyzeCCCDImage(base64Image);
       if (info) {
-        setAiResult(info);
+        onScan(info);
       } else {
         alert("Không tìm thấy mã QR và AI không thể phân tích được thông tin thẻ. Vui lòng chụp rõ hơn hoặc thử lại.");
       }
@@ -116,7 +113,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     try {
       const html5QrCode = new Html5Qrcode('reader', false);
       const result = await html5QrCode.scanFile(file, true);
-      setScannedResult(result);
+      onScan(result);
     } catch (err) {
       // If QR fails on file, try AI
       const reader = new FileReader();
@@ -124,7 +121,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         const base64 = e.target?.result as string;
         const info = await analyzeCCCDImage(base64);
         if (info) {
-          setAiResult(info);
+          onScan(info);
         } else {
           alert("Không tìm thấy mã QR trong ảnh. AI cũng không thể nhận diện được thông tin.");
         }
@@ -149,58 +146,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         </div>
         
         <div className="relative aspect-square bg-black overflow-hidden shadow-inner">
-          <div id="reader" className={`w-full h-full ${(scannedResult || aiResult) ? 'hidden' : ''}`}></div>
+          <div id="reader" className="w-full h-full"></div>
           
-          {(isInitializing || isScanningFile || isProcessing) && !(scannedResult || aiResult) && (
+          {(isInitializing || isScanningFile || isProcessing) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/60 backdrop-blur-sm z-10">
               <RefreshCw className="animate-spin mb-4 text-gold-primary" size={32} />
               <p className="text-[10px] uppercase font-black tracking-widest text-center px-8">
                 {isScanningFile ? 'Đang phân tích file ảnh...' : isProcessing ? 'AI đang nhận diện thông tin...' : 'Đang khởi động camera...'}
               </p>
-            </div>
-          )}
-
-          {(scannedResult || aiResult) && (
-            <div className="absolute inset-0 bg-white p-8 flex flex-col items-center justify-center text-center">
-              <div className={`w-16 h-16 ${scannedResult ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'} rounded-full flex items-center justify-center mb-6 border-4 border-white shadow-xl`}>
-                {scannedResult ? <QrCode size={32} /> : <Sparkles size={32} />}
-              </div>
-              <h4 className="text-xl font-black uppercase tracking-widest mb-2 text-ink">
-                {scannedResult ? 'Đã Đọc Mã QR' : 'AI Đã Phân Tích'}
-              </h4>
-              <p className="text-xs text-neutral-400 mb-8 font-medium italic">
-                {scannedResult ? 'Hệ thống đã nhận diện được mã QR.' : 'Hệ thống AI đã trích xuất dữ liệu từ hình ảnh.'}
-              </p>
-              
-              <div className="bg-neutral-50 w-full p-4 rounded-sm mb-10 text-left border border-neutral-100 overflow-hidden relative shadow-inner">
-                <div className="absolute top-0 right-0 p-1 bg-gold-primary/10 text-gold-dark text-[8px] font-black uppercase tracking-tighter px-2">Xác thực hồ sơ</div>
-                <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-1.5 opacity-60">Kết quả nhận diện:</p>
-                <div className="text-[11px] font-mono break-all text-ink leading-relaxed bg-white/50 p-2 border border-neutral-100 italic">
-                  {scannedResult ? (
-                    <span className="line-clamp-3">{scannedResult}</span>
-                  ) : (
-                    <div className="space-y-1">
-                      <p>Họ tên: <span className="font-bold">{aiResult.name}</span></p>
-                      <p>CCCD: <span className="font-bold">{aiResult.id}</span></p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4 w-full">
-                <button 
-                  onClick={() => onScan(scannedResult || aiResult)}
-                  className="bg-ink text-paper py-5 px-6 font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl hover:bg-gold-primary hover:text-ink transition-all active:scale-95"
-                >
-                  Lưu & Sử dụng thông tin
-                </button>
-                <button 
-                  onClick={() => { setScannedResult(null); setAiResult(null); }}
-                  className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors tracking-widest flex items-center justify-center gap-2"
-                >
-                  <RefreshCw size={12} /> Quét/Chụp lại
-                </button>
-              </div>
             </div>
           )}
 
@@ -218,7 +171,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           )}
 
           {/* Overlay corner marks & SHUTTER BUTTON */}
-          {!isInitializing && !error && !(scannedResult || aiResult) && (
+          {!isInitializing && !error && (
             <>
               <div className="absolute inset-0 pointer-events-none opacity-50 z-0">
                 <div className="absolute top-8 left-8 w-12 h-12 border-t-4 border-l-4 border-gold-primary"></div>
@@ -244,7 +197,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           )}
         </div>
         
-        {!(scannedResult || aiResult) && (
+        {!(isInitializing || error) && (
           <div className="p-4 bg-neutral-50 border-t border-neutral-100 italic flex justify-between items-center px-6">
             <p className="text-[10px] text-ink font-medium leading-relaxed max-w-[180px]">
               Đưa CCCD vào khung hình rồi nhấn nút chụp để AI phân tích.
