@@ -91,6 +91,7 @@ const System: React.FC = () => {
       setLastError(error);
       console.error("Save Price Error:", error);
     } else {
+      alert("Đã cập nhật giá thành công!");
       fetchProducts();
     }
   };
@@ -104,6 +105,7 @@ const System: React.FC = () => {
     if (error) {
       alert("Lỗi khi cập nhật quyền: " + error.message);
     } else {
+      alert("Đã cập nhật quyền nhân viên thành công!");
       fetchProfiles();
       setShowRoleUpdate(null);
     }

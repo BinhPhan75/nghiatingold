@@ -134,12 +134,12 @@ const Reports: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-ink text-paper">
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Thời gian</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Loại</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Khách hàng</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Mặt hàng</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Ngày Giờ</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Loại GD</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Đối tác (Người mua/bán)</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Chi tiết mặt hàng</th>
                 <th className="p-4 font-black uppercase text-[10px] tracking-widest">Số lượng</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Tổng tiền</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-right">Tổng thanh toán</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -154,21 +154,28 @@ const Reports: React.FC = () => {
               ) : (
                 transactions.map(t => (
                   <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
-                    <td className="p-4 font-mono text-[11px] font-bold">
-                      {new Date(t.created_at).toLocaleString('vi-VN')}
+                    <td className="p-4 font-mono text-[10px]">
+                      <div className="font-bold text-ink">{new Date(t.created_at).toLocaleDateString('vi-VN')}</div>
+                      <div className="text-neutral-400">{new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
                     <td className="p-4">
                       <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-sm ${t.type === 'BUY' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-vcb-blue'}`}>
-                        {t.type === 'BUY' ? 'MUA' : 'BÁN'}
+                        {t.type === 'BUY' ? 'MUA VÀO' : 'BÁN RA'}
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="text-sm font-bold uppercase truncate max-w-[150px]">{t.customer_name}</div>
+                      <div className="text-[9px] text-neutral-400 font-black uppercase mb-1">
+                        {t.type === 'BUY' ? 'Người bán (Khách)' : 'Người mua (Khách)'}
+                      </div>
+                      <div className="text-sm font-bold uppercase truncate max-w-[200px]">{t.customer_name}</div>
                       <div className="text-[10px] font-mono text-neutral-400">{t.customer_cccd}</div>
                     </td>
-                    <td className="p-4 font-bold italic">{t.product_name}</td>
+                    <td className="p-4">
+                      <div className="font-bold italic text-ink">{t.product_name}</div>
+                      <div className="text-[9px] text-neutral-400">Đơn giá: {formatCurrency(t.price_per_unit)}</div>
+                    </td>
                     <td className="p-4 font-mono font-bold">{t.quantity} {t.unit}</td>
-                    <td className="p-4 font-mono font-black">{formatCurrency(t.total_amount)}</td>
+                    <td className="p-4 font-mono font-black text-right">{formatCurrency(t.total_amount)}</td>
                   </tr>
                 ))
               )}
