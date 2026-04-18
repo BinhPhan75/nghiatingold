@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import { TrendingUp, TrendingDown, Scale, ShoppingBag, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, ShoppingBag, Clock, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { motion } from 'motion/react';
 
@@ -22,76 +22,96 @@ const Dashboard: React.FC = () => {
   const [sellPieData, setSellPieData] = useState<any[]>([]);
   const [hourlyData, setHourlyData] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [lastError, setLastError] = useState<any>(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: transactions } = await supabase
-      .from('transactions')
-      .select('*')
-      .gte('created_at', `${today}T00:00:00`);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: transactions, error: tError } = await supabase
+        .from('transactions')
+        .select('*')
+        .gte('created_at', `${today}T00:00:00`);
 
-    if (transactions && Array.isArray(transactions)) {
-      const buy = transactions.filter(t => t.type === 'BUY');
-      const sell = transactions.filter(t => t.type === 'SELL');
+      if (tError) throw tError;
 
-      setStats({
-        buyTotal: buy.reduce((s, t) => s + t.total_amount, 0),
-        sellTotal: sell.reduce((s, t) => s + t.total_amount, 0),
-        buyCount: buy.length,
-        sellCount: sell.length,
-      });
+      if (transactions && Array.isArray(transactions)) {
+        const buy = transactions.filter(t => t.type === 'BUY');
+        const sell = transactions.filter(t => t.type === 'SELL');
 
-      // Pie data: weight by product for BUY
-      const buyMap: Record<string, number> = {};
-      buy.forEach(t => {
-        if (t.product_name) {
-          buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
+        setStats({
+          buyTotal: buy.reduce((s, t) => s + t.total_amount, 0),
+          sellTotal: sell.reduce((s, t) => s + t.total_amount, 0),
+          buyCount: buy.length,
+          sellCount: sell.length,
+        });
+
+        // Pie data: weight by product for BUY
+        const buyMap: Record<string, number> = {};
+        buy.forEach(t => {
+          if (t.product_name) {
+            buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
+          }
+        });
+        setBuyPieData(Object.entries(buyMap).map(([name, value]) => ({ name, value })));
+
+        // Pie data: weight by product for SELL
+        const sellMap: Record<string, number> = {};
+        sell.forEach(t => {
+          if (t.product_name) {
+            sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
+          }
+        });
+        setSellPieData(Object.entries(sellMap).map(([name, value]) => ({ name, value })));
+
+        // Bar data: by hour
+        const hourlyMap: Record<number, { hour: string, buy: number, sell: number }> = {};
+        for (let i = 8; i <= 20; i++) {
+          hourlyMap[i] = { hour: `${i}h`, buy: 0, sell: 0 };
         }
-      });
-      setBuyPieData(Object.entries(buyMap).map(([name, value]) => ({ name, value })));
-
-      // Pie data: weight by product for SELL
-      const sellMap: Record<string, number> = {};
-      sell.forEach(t => {
-        if (t.product_name) {
-          sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
-        }
-      });
-      setSellPieData(Object.entries(sellMap).map(([name, value]) => ({ name, value })));
-
-      // Bar data: by hour
-      const hourlyMap: Record<number, { hour: string, buy: number, sell: number }> = {};
-      for (let i = 8; i <= 20; i++) {
-        hourlyMap[i] = { hour: `${i}h`, buy: 0, sell: 0 };
+        transactions.forEach(t => {
+          const h = new Date(t.created_at).getHours();
+          if (hourlyMap[h]) {
+            if (t.type === 'BUY') hourlyMap[h].buy += (t.total_amount || 0);
+            else hourlyMap[h].sell += (t.total_amount || 0);
+          }
+        });
+        setHourlyData(Object.values(hourlyMap));
+      } else {
+        // Fallback clean state if error or no data
+        setStats({ buyTotal: 0, sellTotal: 0, buyCount: 0, sellCount: 0 });
+        setBuyPieData([]);
+        setSellPieData([]);
+        setHourlyData([]);
       }
-      transactions.forEach(t => {
-        const h = new Date(t.created_at).getHours();
-        if (hourlyMap[h]) {
-          if (t.type === 'BUY') hourlyMap[h].buy += (t.total_amount || 0);
-          else hourlyMap[h].sell += (t.total_amount || 0);
-        }
-      });
-      setHourlyData(Object.values(hourlyMap));
-    } else {
-      // Fallback clean state if error or no data
-      setStats({ buyTotal: 0, sellTotal: 0, buyCount: 0, sellCount: 0 });
-      setBuyPieData([]);
-      setSellPieData([]);
-      setHourlyData([]);
-    }
 
-    const { data: pData } = await supabase.from('products').select('*');
-    if (pData) setProducts(pData);
+      const { data: pData, error: pError } = await supabase.from('products').select('*');
+      if (pError) throw pError;
+      if (pData) setProducts(pData);
+      
+      setLastError(null);
+    } catch (err: any) {
+      console.error("Dashboard Fetch Error:", err);
+      setLastError(err);
+    }
   };
 
   const COLORS = ['#D4AF37', '#141414', '#996515', '#006738', '#4b5563'];
 
   return (
     <div className="flex flex-col gap-8">
+      {lastError && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={18} className="text-red-500" />
+            <p className="text-xs text-red-700 font-medium">Lỗi kết nối database: {lastError.message || 'Không rõ nguyên nhân'}</p>
+          </div>
+          <button onClick={() => setLastError(null)} className="text-[10px] font-black uppercase text-red-500 hover:underline">Đóng</button>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="flex flex-col md:flex-row md:items-end gap-6 w-full">
           <div>

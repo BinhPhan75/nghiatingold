@@ -98,12 +98,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       
       if (error) {
-        // Clearer errors for the frontend
-        if (error.code === 'PGRST116') return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
-        if (error.message.includes('column') || error.message.includes('relation')) {
-          return { error: { message: 'Database chưa được thiết lập. Vui lòng chạy lại script SQL trong mục Chẩn đoán.' } };
+        console.error("Login attempt error:", error);
+        
+        // 1. Invalid API Key / URL
+        if (error.message?.includes('Invalid API key') || error.message?.includes('apikey')) {
+          return { error: { message: 'API Key (Anon Key) không hợp lệ. Vui lòng kiểm tra lại trong menu Settings.' } };
         }
-        return { error };
+        
+        // 2. Table not found
+        if (error.code === 'PGRST116' && error.message?.includes('not found')) {
+          return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
+        }
+        
+        if (error.code === '42P01' || error.message?.includes('relation "profiles" does not exist')) {
+          return { error: { message: 'Cơ sở dữ liệu chưa được khởi tạo. Vui lòng copy và chạy SQL script trong file supabase-setup.sql.' } };
+        }
+
+        // 3. RLS or Generic permission error
+        if (error.message?.includes('permission denied')) {
+          return { error: { message: 'Quyền truy cập bị từ chối. Hãy đảm bảo bạn đã chạy đúng SQL setup.' } };
+        }
+
+        return { error: { message: error.message || 'Lỗi kết nối cơ sở dữ liệu' } };
       }
 
       if (!data) return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
@@ -113,8 +129,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('nghiatin_session_id', data.id);
       return { error: null };
     } catch (err: any) {
-      console.error("Login detail error:", err);
-      return { error: { message: err.message || 'Lỗi kết nối cơ sở dữ liệu' } };
+      console.error("Critical login error:", err);
+      // More descriptive error for generic network failures
+      const msg = err.message || '';
+      if (msg.includes('Failed to fetch')) return { error: { message: 'Không thể kết nối tới Supabase. Kiểm tra internet hoặc URL trong Settings.' } };
+      return { error: { message: msg || 'Lỗi hệ thống không xác định' } };
     }
   };
 
