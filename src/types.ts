@@ -3,6 +3,8 @@ export type UserRole = 'ADMIN' | 'ACCOUNTANT' | 'SALES';
 export interface Profile {
   id: string;
   email: string;
+  username?: string;
+  pw?: string;
   full_name: string;
   role: UserRole;
   created_at: string;

@@ -2,14 +2,19 @@
 -- HƯỚNG DẪN: Nếu gặp lỗi "table already exists", hãy xóa các table cũ trước theo thứ tự: 
 -- drop table if exists transactions; drop table if exists profiles; drop table if exists products; drop table if exists system_config;
 
--- 1. Profiles table (linked to auth.users)
+-- 1. Profiles table (linked to auth.users OR managed manually)
 create table if not exists profiles (
-  id uuid references auth.users on delete cascade primary key,
-  email text not null,
+  id uuid primary key default gen_random_uuid(),
+  email text,
+  username text unique,
+  pw text,
   full_name text,
   role text check (role in ('ADMIN', 'ACCOUNTANT', 'SALES')) default 'SALES',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note: In Supabase, if we want to link some to auth.users, we can.
+-- But the user wants simple management.
 
 -- 2. Products table
 create table if not exists products (
@@ -90,9 +95,9 @@ drop policy if exists "Admin quản lý cấu hình" on system_config;
 -- Use auth.jwt() email directly for admin privilege to avoid "Infinite Recursion"
 
 -- 1. Profiles
-create policy "profiles_select_auth" on profiles for select using (auth.role() = 'authenticated');
+create policy "profiles_select_public" on profiles for select using (true);
 create policy "profiles_update_self" on profiles for update using (auth.uid() = id);
-create policy "profiles_admin_all" on profiles for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
+create policy "profiles_admin_all" on profiles for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com' or auth.role() = 'anon');
 
 -- 2. Products
 create policy "products_select_auth" on products for select using (auth.role() = 'authenticated');
@@ -118,8 +123,8 @@ begin
     default_role := 'SALES';
   end if;
 
-  insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', default_role)
+  insert into public.profiles (id, email, username, full_name, role)
+  values (new.id, new.email, split_part(new.email, '@', 1), new.raw_user_meta_data->>'full_name', default_role)
   on conflict (id) do update set role = excluded.role;
   return new;
 end;

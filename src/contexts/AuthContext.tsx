@@ -10,6 +10,8 @@ interface AuthContextType {
   isAccountant: boolean;
   isSales: boolean;
   isConfigured: boolean;
+  login: (username: string, pass: string) => Promise<{ error: any }>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,7 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -25,59 +27,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    let mounted = true;
-    let subscription: { unsubscribe: () => void } | null = null;
-
-    const setupAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          }
-        }
-      } catch (err) {
-        console.error("Auth initialization error:", err);
-      } finally {
-        if (mounted) setLoading(false);
+    const initAuth = async () => {
+      // 1. Check for official Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        setLoading(false);
+        return;
       }
 
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-          }
-          setLoading(false);
+      // 2. Check for local session
+      const localSessionId = localStorage.getItem('nghiatin_session_id');
+      if (localSessionId) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', localSessionId)
+          .single();
+        
+        if (!error && data) {
+          setProfile(data);
+          setUser({ id: data.id, email: data.email, local: true });
+        } else {
+          localStorage.removeItem('nghiatin_session_id');
         }
-      });
-      subscription = data.subscription;
+      }
+      setLoading(false);
     };
 
-    setupAuth();
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+      } else {
+        // Only clear if not a local session
+        if (!localStorage.getItem('nghiatin_session_id')) {
+          setUser(null);
+          setProfile(null);
+        }
+      }
+    });
 
     return () => {
-      mounted = false;
-      if (subscription) subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
-  const fetchProfile = async (uid: string) => {
+  const login = async (username: string, pass: string) => {
     try {
+      // Check profiles table
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', uid)
+        .eq('username', username)
+        .eq('pw', pass)
         .single();
-
-      if (!error && data) {
-        setProfile(data);
+      
+      if (error || !data) {
+        return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
       }
-    } catch (err) {
-      console.error("Profile fetch error:", err);
+
+      setProfile(data);
+      setUser({ id: data.id, email: data.email, local: true });
+      localStorage.setItem('nghiatin_session_id', data.id);
+      return { error: null };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('nghiatin_session_id');
+    setUser(null);
+    setProfile(null);
+  };
+
+  const fetchProfile = async (uid: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
+
+    if (!error && data) {
+      setProfile(data);
     }
   };
 
@@ -92,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAccountant: role === 'ACCOUNTANT',
     isSales: role === 'SALES' || (!role && !isAdminEmail),
     isConfigured: isSupabaseConfigured,
+    login,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

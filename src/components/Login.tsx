@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Briefcase, LogIn, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Email or Username
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   if (!isSupabaseConfigured) {
     return <Navigate to="/" replace />;
@@ -21,27 +23,35 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      // Map 'admin' username to 'binhphan.070582@gmail.com' as Supabase requires email
-      const loginEmail = email.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : email;
-
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password,
-      });
-
-      if (authError) {
-        if (authError.message.toLowerCase().includes('invalid login credentials') && email.toLowerCase() === 'admin' && password === '220785') {
-          setError('Tài khoản ADMIN chưa được khởi tạo. Vui lòng tạo tài khoản binhphan.070582@gmail.com với mật khẩu 220785 trong Supabase Dashboard.');
-        } else {
-          setError('Thông tin đăng nhập không chính xác');
-        }
-        setLoading(false);
-      } else if (data.session) {
+      // 1. Try custom username/password first
+      const { error: loginError } = await login(identifier, password);
+      
+      if (!loginError) {
         navigate('/');
+        return;
+      }
+
+      // 2. Fallback to Supabase Auth if it's an email
+      if (identifier.includes('@')) {
+        const { supabase } = await import('../lib/supabase');
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password,
+        });
+
+        if (authError) {
+          setError('Thông tin đăng nhập không chính xác');
+        } else if (authData.session) {
+          navigate('/');
+          return;
+        }
+      } else {
+        setError(loginError.message || 'Thông tin đăng nhập không chính xác');
       }
     } catch (err: any) {
       console.error("Login unexpected error:", err);
       setError(err.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+    } finally {
       setLoading(false);
     }
   };
@@ -70,14 +80,14 @@ const Login: React.FC = () => {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div className="input-field">
-            <label htmlFor="email">Email đăng nhập / Username</label>
+            <label htmlFor="identifier">Tên đăng nhập / Email</label>
             <input 
-              id="email"
-              name="email"
+              id="identifier"
+              name="identifier"
               type="text" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="binhphan.070582@gmail.com hoặc 'admin'"
+              value={identifier} 
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Nhập username hoặc bphan@store.vn"
               required
               disabled={loading}
               autoComplete="username"

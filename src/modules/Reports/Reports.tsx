@@ -87,6 +87,62 @@ const Reports: React.FC = () => {
     .filter(t => t.type === 'SELL')
     .reduce((sum, t) => sum + t.total_amount, 0);
 
+  const totalCashAcross = transactions.reduce((sum, t) => sum + (t.tien_mat || 0), 0);
+  const totalTransferAcross = transactions.reduce((sum, t) => sum + (t.chuyen_khoan || 0), 0);
+
+  const handleExport = () => {
+    if (transactions.length === 0) {
+      alert("Không có dữ liệu để xuất.");
+      return;
+    }
+
+    const headers = [
+      "Thời gian",
+      "Loại GD",
+      "Khách hàng",
+      "CCCD",
+      "Địa chỉ",
+      "Mặt hàng",
+      "Số lượng",
+      "Đơn vị",
+      "Đơn giá",
+      "Tổng tiền",
+      "Tiền mặt",
+      "Chuyển khoản",
+      "Nhân viên"
+    ];
+
+    const rows = transactions.map(t => [
+      new Date(t.created_at).toLocaleString('vi-VN'),
+      t.type === 'BUY' ? "MUA VÀO" : "BÁN RA",
+      t.customer_name,
+      `'${t.customer_cccd}`, // Prefix with ' to avoid Excel numeric formatting
+      t.dia_chi || "",
+      t.product_name,
+      t.quantity,
+      t.unit,
+      t.price_per_unit,
+      t.total_amount,
+      t.tien_mat || 0,
+      t.chuyen_khoan || 0,
+      t.salesperson?.full_name || "Hệ thống"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bao_cao_giao_dich_${startDate}_to_${endDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center p-20 italic text-neutral-400 font-bold">
@@ -206,20 +262,26 @@ FOREIGN KEY (created_by) REFERENCES profiles(id);`}
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-paper p-6 border-l-4 border-red-500 shadow-sm flex justify-between items-center">
-          <div>
-            <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest">Tổng chi mua vào</p>
-            <h3 className="text-2xl text-red-600">{formatCurrency(totalBuy)}</h3>
-          </div>
-          <ArrowDownCircle className="text-red-100" size={48} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-paper p-4 border-l-4 border-red-500 shadow-sm">
+          <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest flex items-center gap-1">
+            <ArrowDownCircle size={10} /> Chi mua vào
+          </p>
+          <h3 className="text-xl font-bold text-ink">{formatCurrency(totalBuy)}</h3>
         </div>
-        <div className="bg-paper p-6 border-l-4 border-vcb-blue shadow-sm flex justify-between items-center">
-          <div>
-            <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest">Tổng thu bán ra</p>
-            <h3 className="text-2xl text-vcb-blue">{formatCurrency(totalSell)}</h3>
-          </div>
-          <ArrowUpCircle className="text-green-100" size={48} />
+        <div className="bg-paper p-4 border-l-4 border-vcb-blue shadow-sm">
+          <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest flex items-center gap-1">
+            <ArrowUpCircle size={10} /> Thu bán ra
+          </p>
+          <h3 className="text-xl font-bold text-ink">{formatCurrency(totalSell)}</h3>
+        </div>
+        <div className="bg-paper p-4 border-l-4 border-orange-500 shadow-sm">
+          <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest">Tổng tiền mặt</p>
+          <h3 className="text-xl font-bold text-ink">{formatCurrency(totalCashAcross)}</h3>
+        </div>
+        <div className="bg-paper p-4 border-l-4 border-green-600 shadow-sm">
+          <p className="text-[10px] uppercase font-black text-neutral-400 mb-1 tracking-widest">Tổng chuyển khoản</p>
+          <h3 className="text-xl font-bold text-ink">{formatCurrency(totalTransferAcross)}</h3>
         </div>
       </div>
 
@@ -227,7 +289,10 @@ FOREIGN KEY (created_by) REFERENCES profiles(id);`}
       <div className="bg-paper rounded-sm shadow-sm border border-neutral-100 overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center bg-neutral-50 px-4 md:px-6">
           <span className="text-[10px] font-black uppercase text-neutral-400 italic">Dữ liệu chi tiết: {transactions.length} giao dịch</span>
-          <button className="flex items-center gap-2 text-[10px] font-black uppercase text-ink hover:text-gold-primary">
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-2 text-[10px] font-black uppercase text-ink hover:text-gold-primary"
+          >
             <Download size={14} /> <span className="hidden sm:inline">Xuất CSV</span>
           </button>
         </div>
