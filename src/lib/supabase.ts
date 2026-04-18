@@ -1,28 +1,18 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let instance: SupabaseClient | null = null;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-const getSupabase = (): SupabaseClient => {
-  if (instance) return instance;
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
 
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Create a singleton client or a dummy one to avoid crashes during static analysis/initial load
+export const supabase: SupabaseClient = isSupabaseConfigured 
+  ? createClient(supabaseUrl, supabaseKey)
+  : {} as SupabaseClient;
 
-  if (!url || !key) {
-    throw new Error('Supabase configuration missing. Please provide VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment variables.');
+export const getSupabase = () => {
+  if (!isSupabaseConfigured) {
+    throw new Error('Supabase configuration missing. Please provide VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
   }
-
-  instance = createClient(url, key);
-  return instance;
+  return supabase;
 };
-
-// Lazy-initialized proxy to prevent crash on module load
-export const supabase = new Proxy({} as SupabaseClient, {
-  get: (target, prop) => {
-    const client = getSupabase();
-    const value = (client as any)[prop];
-    return typeof value === 'function' ? value.bind(client) : value;
-  }
-});
-
-export const isSupabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);

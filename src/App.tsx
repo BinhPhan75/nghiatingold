@@ -45,8 +45,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, roles?: UserRole[] }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-ink flex items-center justify-center">
+      <div className="min-h-screen bg-ink flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-gold-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-[10px] uppercase font-black tracking-widest text-gold-primary animate-pulse">Đang kiểm tra hệ thống...</p>
       </div>
     );
   }
@@ -56,7 +57,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, roles?: UserRole[] }
   }
 
   if (roles && profile && !roles.includes(profile.role)) {
-    return <Navigate to={profile.role === 'ACCOUNTANT' ? "/reports" : "/"} replace />;
+    // If user is logged in but doesn't have role, and Accountant is restricted from Dashboard
+    if (profile.role === 'ACCOUNTANT' && window.location.pathname === '/') {
+      return <Navigate to="/reports" replace />;
+    }
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

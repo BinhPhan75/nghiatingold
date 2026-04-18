@@ -17,6 +17,12 @@ create table if not exists profiles (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Seed an initial admin account if none exists
+-- Note: Replace '220785' with a secure password in production
+INSERT INTO profiles (email, username, pw, full_name, role)
+SELECT 'binhphan.070582@gmail.com', 'admin', '220785', 'Administrator', 'ADMIN'
+WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE username = 'admin' OR email = 'binhphan.070582@gmail.com');
+
 -- Note: In Supabase, if we want to link some to auth.users, we can.
 -- But the user wants simple management.
 

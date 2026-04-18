@@ -63,6 +63,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
+    // Fallback loading safety: Force stop loading after 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -74,16 +79,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(null);
         }
       }
+      setLoading(false);
     });
 
     return () => {
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
 
   const login = async (username: string, pass: string) => {
     try {
-      // Check profiles table
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -91,16 +97,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('pw', pass)
         .single();
       
-      if (error || !data) {
-        return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
+      if (error) {
+        // Clearer errors for the frontend
+        if (error.code === 'PGRST116') return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
+        if (error.message.includes('column') || error.message.includes('relation')) {
+          return { error: { message: 'Database chưa được thiết lập. Vui lòng chạy lại script SQL trong mục Chẩn đoán.' } };
+        }
+        return { error };
       }
+
+      if (!data) return { error: { message: 'Tên đăng nhập hoặc mật khẩu không đúng' } };
 
       setProfile(data);
       setUser({ id: data.id, email: data.email, local: true });
       localStorage.setItem('nghiatin_session_id', data.id);
       return { error: null };
     } catch (err: any) {
-      return { error: err };
+      console.error("Login detail error:", err);
+      return { error: { message: err.message || 'Lỗi kết nối cơ sở dữ liệu' } };
     }
   };
 
