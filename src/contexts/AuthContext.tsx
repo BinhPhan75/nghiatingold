@@ -28,32 +28,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const initAuth = async () => {
-      // 1. Check for official Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Check for local session
-      const localSessionId = localStorage.getItem('nghiatin_session_id');
-      if (localSessionId) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', localSessionId)
-          .single();
-        
-        if (!error && data) {
-          setProfile(data);
-          setUser({ id: data.id, email: data.email, local: true });
-        } else {
-          localStorage.removeItem('nghiatin_session_id');
+      try {
+        // 1. Check for official Supabase session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+          setLoading(false);
+          return;
         }
+
+        // 2. Check for local session
+        const localSessionId = localStorage.getItem('nghiatin_session_id');
+        if (localSessionId) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', localSessionId)
+            .single();
+          
+          if (!error && data) {
+            setProfile(data);
+            setUser({ id: data.id, email: data.email, local: true });
+          } else {
+            localStorage.removeItem('nghiatin_session_id');
+          }
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
@@ -107,14 +112,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const fetchProfile = async (uid: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .single();
 
-    if (!error && data) {
-      setProfile(data);
+      if (!error && data) {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error("Profile fetch error:", err);
     }
   };
 

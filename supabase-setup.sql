@@ -3,6 +3,10 @@
 -- drop table if exists transactions; drop table if exists profiles; drop table if exists products; drop table if exists system_config;
 
 -- 1. Profiles table (linked to auth.users OR managed manually)
+-- Đảm bảo các cột mới tồn tại cho các tài khoản cũ
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username text unique;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pw text;
+
 create table if not exists profiles (
   id uuid primary key default gen_random_uuid(),
   email text,

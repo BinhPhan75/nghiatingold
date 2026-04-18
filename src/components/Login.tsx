@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Briefcase, LogIn, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -23,7 +23,7 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Try custom username/password first
+      // 1. Try custom username/password from profiles table first
       const { error: loginError } = await login(identifier, password);
       
       if (!loginError) {
@@ -31,26 +31,32 @@ const Login: React.FC = () => {
         return;
       }
 
-      // 2. Fallback to Supabase Auth if it's an email
-      if (identifier.includes('@')) {
-        const { supabase } = await import('../lib/supabase');
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: identifier,
-          password,
-        });
+      // 2. Fallback to Supabase Auth if the custom login failed
+      // This is for users who registered via standard email/password
+      const loginEmail = identifier.includes('@') ? identifier : 
+                         (identifier.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : identifier);
 
-        if (authError) {
-          setError('Thông tin đăng nhập không chính xác');
-        } else if (authData.session) {
-          navigate('/');
-          return;
-        }
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
+      });
+
+      if (!authError && authData.session) {
+        navigate('/');
+        return;
+      }
+
+      // If both fail, show the most relevant error
+      // If the identifier was an email, show auth error, otherwise show custom login error
+      if (identifier.includes('@') && authError) {
+        setError(authError.message);
       } else {
         setError(loginError.message || 'Thông tin đăng nhập không chính xác');
       }
+      
     } catch (err: any) {
       console.error("Login unexpected error:", err);
-      setError(err.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+      setError('Đã có lỗi xảy ra hoặc database chưa được cấu hình đúng. Vui lòng kiểm tra mục Hệ Thống.');
     } finally {
       setLoading(false);
     }
