@@ -7,14 +7,13 @@ import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup' | 'diagnostics'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup'>('prices');
 
   const tabs = [
     { id: 'prices', label: 'Giá Vàng', roles: ['ADMIN', 'SALES'] },
     { id: 'users', label: 'Nhân Viên', roles: ['ADMIN'] },
     { id: 'bank', label: 'Ngân Hàng', roles: ['ADMIN'] },
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
-    { id: 'diagnostics', label: 'Kiểm Tra Kết Nối', roles: ['ADMIN'] },
   ];
 
   const filteredTabs = tabs.filter(t => {
@@ -34,34 +33,13 @@ const System: React.FC = () => {
   const [restoring, setRestoring] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState<string | null>(null);
   const [lastError, setLastError] = useState<any>(null);
-  const [dbStatus, setDbStatus] = useState<{ loading: boolean; connected: boolean; message: string }>({ 
-    loading: false, connected: false, message: 'Chưa thực hiện kiểm tra' 
-  });
 
   useEffect(() => {
     setLastError(null);
     fetchProducts();
     fetchConfig();
     if (isAdmin || activeTab === 'users') fetchProfiles();
-    if (activeTab === 'diagnostics') checkConnection();
   }, [activeTab, isAdmin]);
-
-  const checkConnection = async () => {
-    setDbStatus({ loading: true, connected: false, message: 'Đang kết nối tới database...' });
-    try {
-      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
-      if (error) throw error;
-      setDbStatus({ loading: false, connected: true, message: 'Kết nối thành công! Database hoạt động bình thường.' });
-    } catch (err: any) {
-      console.error("Connection Check Error:", err);
-      setDbStatus({ 
-        loading: false, 
-        connected: false, 
-        message: `Lỗi kết nối: ${err.message || 'Không thể truy cập Supabase. Hãy kiểm tra lại URL/Key trong cấu hình dự án.'}` 
-      });
-      setLastError(err);
-    }
-  };
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').order('name');
@@ -304,31 +282,6 @@ const System: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {lastError && (
-        <div className="bg-red-900/90 text-white p-6 rounded-sm text-xs font-mono mb-6 flex justify-between items-start backdrop-blur-sm border-l-4 border-red-500 shadow-xl">
-          <div className="overflow-x-auto w-full">
-            <p className="font-bold mb-3 text-sm flex items-center gap-2">
-              <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (SUPABASE ERROR):
-            </p>
-            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
-              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
-            </div>
-            <div className="bg-white/10 p-4 rounded text-red-100">
-              <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
-              <ul className="list-disc ml-4 space-y-1">
-                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
-                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
-                <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
-              </ul>
-              <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
-            </div>
-          </div>
-          <button onClick={() => setLastError(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4 focus:outline-none">
-            <X size={20} />
-          </button>
-        </div>
-      )}
 
       <div className="bg-paper p-8 rounded-sm shadow-sm border border-neutral-100 min-h-[500px]">
         {activeTab === 'prices' && (
@@ -702,69 +655,6 @@ const System: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        {activeTab === 'diagnostics' && (
-          <div className="flex flex-col gap-8 max-w-2xl">
-            <div className="flex items-center gap-3 border-b border-neutral-100 pb-4 mb-4">
-              <ShieldCheck className="text-gold-primary" />
-              <h3 className="text-xl inline-flex items-center gap-4">
-                Chẩn đoán kết nối Database
-                {dbStatus.loading ? (
-                  <span className="text-[10px] bg-neutral-100 px-2 py-1 italic animate-pulse">Checking...</span>
-                ) : (
-                  <span className={`text-[10px] px-2 py-1 font-black uppercase tracking-widest ${dbStatus.connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {dbStatus.connected ? 'ONLINE' : 'OFFLINE'}
-                  </span>
-                )}
-              </h3>
-            </div>
-
-            <div className={`p-6 border-l-4 ${dbStatus.connected ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'} rounded-sm shadow-sm`}>
-              <p className="font-bold mb-2">Trạng thái hiện tại:</p>
-              <p className="text-sm italic">{dbStatus.message}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình URL</p>
-                <code className="text-[11px] block break-all font-mono">
-                  {import.meta.env.VITE_SUPABASE_URL ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_URL'}
-                </code>
-              </div>
-              <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình API Key</p>
-                <code className="text-[11px] block break-all font-mono">
-                  {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_ANON_KEY'}
-                </code>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 p-6 border border-amber-200 rounded-sm">
-              <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2">
-                <ShieldCheck size={18} /> Lưu ý quan trọng về Quyền hạn (RLS)
-              </h4>
-              <p className="text-sm text-amber-700 mb-4">
-                Nếu bạn thấy trạng thái "ONLINE" nhưng vẫn không thể "Thêm mặt hàng", thì chắc chắn 100% là do **Row Level Security (RLS)** trên Supabase đang chặn yêu cầu của bạn.
-              </p>
-              <div className="bg-paper p-4 rounded border border-amber-100">
-                <p className="font-bold text-xs uppercase mb-2">Cách khắc phục:</p>
-                <ol className="text-xs list-decimal ml-4 space-y-2 text-neutral-600">
-                  <li>Truy cập <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-500 underline">Supabase Dashboard</a>.</li>
-                  <li>Mở mục <strong>SQL Editor</strong>.</li>
-                  <li>Copy nội dung từ file <strong>supabase-setup.sql</strong> trong mã nguồn ứng dụng này.</li>
-                  <li>Dán vào SQL Editor và nhấn <strong>Run</strong>.</li>
-                  <li>Nếu thấy thông báo "Success", hãy quay lại đây và thử lại.</li>
-                </ol>
-              </div>
-            </div>
-
-            <button 
-              onClick={checkConnection}
-              className="bg-ink text-paper py-4 px-6 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
-            >
-              Thử kết nối lại
-            </button>
           </div>
         )}
       </div>
