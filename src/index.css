@@ -53,7 +53,7 @@
 }
 
 .input-field input, .input-field select {
-  @apply p-3 border border-neutral-200 text-lg font-bold outline-none focus:border-ink transition-colors;
+  @apply p-3 border border-neutral-200 text-lg font-bold outline-none focus:border-ink transition-colors text-ink bg-white;
 }
 
 .cccd-box {
