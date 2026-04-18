@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight } from 'lucide-react';
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, getVCBDeepLink, formatCurrency } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,10 +21,12 @@ const Transactions: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [customPrice, setCustomPrice] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
+  const [lastError, setLastError] = useState<any>(null);
 
   useEffect(() => {
     const searchType = searchParams.get('type');
@@ -48,10 +50,15 @@ const Transactions: React.FC = () => {
     if (data) setConfig(data);
   };
 
-  const currentPrice = selectedProduct 
-    ? (type === 'BUY' ? selectedProduct.buy_price : selectedProduct.sell_price) 
-    : 0;
-  
+  useEffect(() => {
+    if (selectedProduct) {
+      setCustomPrice(type === 'BUY' ? selectedProduct.buy_price : selectedProduct.sell_price);
+    } else {
+      setCustomPrice(0);
+    }
+  }, [selectedProduct, type]);
+
+  const currentPrice = customPrice;
   const totalAmount = currentPrice * quantity;
 
   const handleScan = (data: string) => {
@@ -87,15 +94,18 @@ const Transactions: React.FC = () => {
       created_by: profile?.id,
     };
 
+    setLastError(null);
     const { error } = await supabase.from('transactions').insert([transaction]);
 
     if (!error) {
       if (type === 'SELL') {
         const desc = `${customerName} ${customerCCCD} THANH TOAN TIEN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name}`;
-        if (config) {
+        if (config && config.bank_id && config.account_no && config.account_holder) {
           const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, totalAmount, desc);
           setQrUrl(url);
           setShowQR(true);
+        } else {
+          alert("Lỗi: Thông tin ngân hàng chưa đầy đủ (Thiếu mã Bank, số tài khoản hoặc tên chủ tài khoản). Vui lòng kiểm tra lại trong mục Hệ Thống > Ngân Hàng.");
         }
       } else {
         // Mode: BUY (Customer sells to us, we pay them)
@@ -105,7 +115,8 @@ const Transactions: React.FC = () => {
         setShowSuccess(true);
       }
     } else {
-      alert("Đã có lỗi xảy ra khi lưu giao dịch");
+      setLastError(error);
+      alert("Đã có lỗi xảy ra khi lưu giao dịch: " + (error.message || "Kiểm tra quyền truy cập database"));
     }
   };
 
@@ -118,8 +129,37 @@ const Transactions: React.FC = () => {
     setShowQR(false);
   };
 
+  const { user } = useAuth();
+  const currentUserEmail = user?.email;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="flex flex-col gap-6">
+      {lastError && (
+        <div className="bg-red-900/90 text-white p-6 rounded-sm text-xs font-mono mb-6 flex justify-between items-start backdrop-blur-sm border-l-4 border-red-500 shadow-xl">
+          <div className="overflow-x-auto w-full">
+            <p className="font-bold mb-3 text-sm flex items-center gap-2">
+              <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (TRANSACTION ERROR):
+            </p>
+            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
+            </div>
+            <div className="bg-white/10 p-4 rounded text-red-100">
+              <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
+              <ul className="list-disc ml-4 space-y-1">
+                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
+                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
+              </ul>
+              <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
+            </div>
+          </div>
+          <button onClick={() => setLastError(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4 focus:outline-none">
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Transaction Control */}
       <motion.div 
         initial={{ opacity: 0, x: -20 }}
@@ -201,10 +241,13 @@ const Transactions: React.FC = () => {
               />
             </div>
             <div className="input-field">
-              <label>Đơn giá hiện tại</label>
-              <div className="h-[52px] border border-neutral-200 bg-neutral-50 flex items-center px-3 font-mono font-bold text-lg">
-                {formatCurrency(currentPrice)}
-              </div>
+              <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
+              <input 
+                type="number"
+                value={customPrice}
+                className="font-mono font-bold text-lg bg-neutral-50 focus:bg-white"
+                onChange={(e) => setCustomPrice(Number(e.target.value))}
+              />
             </div>
           </div>
         </div>
@@ -287,6 +330,7 @@ const Transactions: React.FC = () => {
           onClose={() => setShowScanner(false)} 
         />
       )}
+      </div>
     </div>
   );
 };

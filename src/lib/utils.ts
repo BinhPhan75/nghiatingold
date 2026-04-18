@@ -13,19 +13,30 @@ export interface CCCDInfo {
 export const parseCCCD = (qrData: string): CCCDInfo | null => {
   if (!qrData) return null;
   try {
-    // Basic hygiene: remove potential whitespace
-    const cleanData = qrData.trim();
-    const parts = cleanData.split('|');
+    // Basic hygiene: remove potential whitespace and non-printable characters
+    const cleanData = qrData.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, "");
     
-    // Vietnamese CCCD format usually has 7 parts
-    if (parts.length < 6) return null;
+    // Vietnamese CCCD format usually uses '|' as separator. 
+    let parts = cleanData.split('|');
+    
+    // If fewer than 6 parts, it's likely not a valid CCCD format we recognize.
+    if (parts.length < 6) {
+      console.warn("QR Data format unrecognized. Expected at least 6 parts, got:", parts.length);
+      return null;
+    }
+
+    // Ensure we don't return empty values
+    const cccdId = parts[0]?.trim();
+    const cccdName = parts[2]?.trim();
+    
+    if (!cccdId || !cccdName) return null;
 
     return {
-      id: parts[0],
-      name: parts[2],
-      dob: parts[3],
-      gender: parts[4],
-      address: parts[5],
+      id: cccdId,
+      name: cccdName,
+      dob: parts[3]?.trim() || '',
+      gender: parts[4]?.trim() || '',
+      address: parts[5]?.trim() || '',
     };
   } catch (e) {
     console.error("Error parsing CCCD QR", e);
