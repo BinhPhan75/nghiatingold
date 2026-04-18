@@ -18,7 +18,8 @@ const Dashboard: React.FC = () => {
     buyCount: 0,
     sellCount: 0,
   });
-  const [pieData, setPieData] = useState<any[]>([]);
+  const [buyPieData, setBuyPieData] = useState<any[]>([]);
+  const [sellPieData, setSellPieData] = useState<any[]>([]);
   const [hourlyData, setHourlyData] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -44,12 +45,19 @@ const Dashboard: React.FC = () => {
         sellCount: sell.length,
       });
 
-      // Pie data: weight by product
-      const productMap: Record<string, number> = {};
-      transactions.forEach(t => {
-        productMap[t.product_name] = (productMap[t.product_name] || 0) + t.total_amount;
+      // Pie data: weight by product for BUY
+      const buyMap: Record<string, number> = {};
+      buy.forEach(t => {
+        buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
       });
-      setPieData(Object.entries(productMap).map(([name, value]) => ({ name, value })));
+      setBuyPieData(Object.entries(buyMap).map(([name, value]) => ({ name, value })));
+
+      // Pie data: weight by product for SELL
+      const sellMap: Record<string, number> = {};
+      sell.forEach(t => {
+        sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
+      });
+      setSellPieData(Object.entries(sellMap).map(([name, value]) => ({ name, value })));
 
       // Bar data: by hour
       const hourlyMap: Record<number, { hour: string, buy: number, sell: number }> = {};
@@ -189,12 +197,12 @@ const Dashboard: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
              <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
-              <h3 className="mb-4 italic">Tỷ trọng mặt hàng</h3>
+              <h3 className="mb-4 italic text-red-600">Tỷ trọng mặt hàng MUA VÀO</h3>
               <div className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={pieData}
+                      data={buyPieData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -202,29 +210,40 @@ const Dashboard: React.FC = () => {
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {pieData.map((_entry, index) => (
+                      {buyPieData.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend iconType="rect" wrapperStyle={{fontSize: '10px', fontWeight: 800, textTransform: 'uppercase'}} />
+                    <Legend iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div className="bg-ink p-8 rounded-sm shadow-xl flex flex-col justify-center items-center text-center text-paper relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 group-hover:rotate-0 transition-transform">
-                <Scale size={120} />
+            <div className="bg-paper p-6 rounded-sm shadow-sm border border-neutral-100">
+              <h3 className="mb-4 italic text-vcb-blue">Tỷ trọng mặt hàng BÁN RA</h3>
+              <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={sellPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {sellPieData.map((_entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <Legend iconType="rect" wrapperStyle={{fontSize: '9px', fontWeight: 800, textTransform: 'uppercase'}} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-[10px] uppercase font-black text-gold-primary tracking-[0.3em] mb-4">NGHIATIN GOLD</p>
-              <h4 className="text-2xl mb-4 leading-tight italic">Hệ thống quản lý vàng bạc hiện đại nhất.</h4>
-              <button 
-                className="bg-gold-primary text-ink py-2 px-8 font-black uppercase text-[10px] tracking-widest hover:bg-paper transition-all"
-                onClick={() => window.location.href='/transactions'}
-              >
-                Giao dịch ngay
-              </button>
             </div>
           </div>
         </div>

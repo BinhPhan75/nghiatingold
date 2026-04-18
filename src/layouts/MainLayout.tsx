@@ -69,8 +69,9 @@ const MainLayout: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-[9px] uppercase font-black text-neutral-400 leading-none mb-1">Store</p>
-              <p className="text-xs font-bold leading-none">{profile?.full_name || 'Đang tải...'}</p>
+              <p className="text-xs font-black uppercase tracking-widest text-ink">
+                {profile?.full_name || (profile?.role === 'ADMIN' ? 'Quản trị viên' : profile?.role === 'ACCOUNTANT' ? 'Kế toán' : profile?.role === 'SALES' ? 'Nhân viên bán hàng' : '')}
+              </p>
             </div>
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gold-primary/10 border border-gold-primary flex items-center justify-center font-black text-gold-dark text-xs md:text-base">
               {profile?.full_name?.charAt(0) || 'U'}
