@@ -28,6 +28,7 @@ const Transactions: React.FC = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
 
@@ -135,13 +136,24 @@ const Transactions: React.FC = () => {
         }
       } else {
         // Mode: BUY (Store buys from customer, Store pays customer)
-        const desc = `THANH TOAN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name} CHO ${customerName}`;
+        const memo = `NGHIATIN GOLD - [MUA VANG] - ${customerName}`;
         if (customerAccount) {
-          window.location.href = getVCBDeepLink(customerBank, customerAccount, totalAmount, desc);
+          setIsPaying(true);
+          const deepLink = getVCBDeepLink(customerBank, customerAccount, totalAmount, memo);
+          const imageUrl = getVietQRUrl(customerBank, customerAccount, customerName, totalAmount, memo);
+          
+          setQrUrl(imageUrl);
+          
+          // Small delay for better UX transition
+          setTimeout(() => {
+            window.location.href = deepLink;
+            setIsPaying(false);
+            setShowSuccess(true);
+          }, 1200);
         } else {
-          window.location.href = `vietcombank://`; // Fallback to just open app if no account
+          window.location.href = `vietcombank://`; 
+          setShowSuccess(true);
         }
-        setShowSuccess(true);
       }
     } else {
       setLastError(error);
@@ -412,21 +424,42 @@ const Transactions: React.FC = () => {
           ) : showSuccess ? (
             <motion.div 
               key="success"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-green-600 text-white p-12 rounded-sm shadow-xl flex flex-col items-center text-center"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white p-8 rounded-sm shadow-xl flex flex-col items-center text-center border-t-8 border-vcb-blue"
             >
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mb-6">
-                <CheckCircle2 size={40} />
+              <div className="w-16 h-16 bg-vcb-blue/10 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 size={32} className="text-vcb-blue" />
               </div>
-              <h3 className="text-3xl text-white mb-2">Thành công</h3>
-              <p className="mb-8 opacity-90 font-medium">Đã chuyển thông tin tới app Vietcombank và lưu giao dịch.</p>
-              <button 
-                onClick={resetForm}
-                className="bg-white text-green-600 py-3 px-8 font-black uppercase text-xs tracking-widest rounded-sm hover:bg-neutral-100 transition-all"
-              >
-                Tiếp tục giao dịch
-              </button>
+              <h3 className="text-2xl mb-2 italic">Giao dịch đã ghi nhận</h3>
+              <p className="text-xs text-neutral-500 mb-6 font-medium">Hệ thống đã cố gắng mở App ngân hàng. Nếu App chưa mở, vui lòng quét mã bên dưới hoặc bấm nút mở App.</p>
+              
+              <div className="bg-white p-2 border border-neutral-100 shadow-sm mb-6">
+                <img 
+                  src={qrUrl} 
+                  alt="VietQR Fallback" 
+                  className="w-56 h-auto" 
+                  referrerPolicy="no-referrer" 
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 w-full">
+                <button 
+                  onClick={() => {
+                    const memo = `NGHIATIN GOLD - [MUA VANG] - ${customerName}`;
+                    window.location.href = getVCBDeepLink(customerBank, customerAccount, totalAmount, memo);
+                  }}
+                  className="w-full py-4 bg-vcb-blue text-white font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-ink transition-all shadow-md"
+                >
+                  <Send size={18} /> Thử mở lại App Ngân Hàng
+                </button>
+                <button 
+                  onClick={resetForm}
+                  className="w-full py-3 border border-neutral-200 text-neutral-400 font-black uppercase text-[10px] tracking-widest hover:border-ink hover:text-ink transition-all"
+                >
+                  Hoàn thành & Quay lại
+                </button>
+              </div>
             </motion.div>
           ) : (
             <motion.div 
@@ -448,6 +481,22 @@ const Transactions: React.FC = () => {
           onClose={() => setShowScanner(false)} 
         />
       )}
+
+      {/* Payment Loading Overlay */}
+      <AnimatePresence>
+        {isPaying && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-paper"
+          >
+            <div className="w-24 h-24 border-t-2 border-gold-primary rounded-full animate-spin mb-8"></div>
+            <h2 className="text-2xl italic mb-2">Đang kết nối...</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-primary">Chuẩn bị mở App Vietcombank</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </div>
     </div>
   );
