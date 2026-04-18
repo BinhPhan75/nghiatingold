@@ -99,7 +99,8 @@ const Transactions: React.FC = () => {
 
     if (!error) {
       if (type === 'SELL') {
-        const desc = `${customerName} ${customerCCCD} THANH TOAN TIEN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name}`;
+        // Optimized description: Short and informative to avoid truncation in banking apps
+        const desc = `${customerCCCD} ${selectedProduct.name} x${quantity}`;
         if (config && config.bank_id && config.account_no && config.account_holder) {
           const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, totalAmount, desc);
           setQrUrl(url);
@@ -283,13 +284,51 @@ const Transactions: React.FC = () => {
               className="bg-white p-8 rounded-sm shadow-xl flex flex-col items-center text-center"
             >
               <h3 className="mb-4">Mã thanh toán VietQR</h3>
-              <div className="bg-white p-4 border border-neutral-100 shadow-inner mb-6">
-                <img src={qrUrl} alt="VietQR" className="w-64 h-64" referrerPolicy="no-referrer" />
+              <div className="bg-white p-2 border border-neutral-100 shadow-inner mb-6 ring-4 ring-neutral-50">
+                <img 
+                  src={qrUrl} 
+                  alt="VietQR" 
+                  className="w-72 h-auto" 
+                  referrerPolicy="no-referrer" 
+                />
               </div>
-              <p className="text-sm font-bold mb-1">{config?.account_holder}</p>
-              <p className="text-xs text-neutral-500 mb-6 font-medium">{config?.bank_name}: {config?.account_no}</p>
               
-              <button onClick={resetForm} className="text-[10px] font-black uppercase text-ink underline underline-offset-4">Xong giao dịch</button>
+              <div className="w-full bg-neutral-50 p-4 rounded-sm border border-neutral-100 mb-6 text-left">
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản</p>
+                <div className="flex justify-between items-center gap-4">
+                  <span className="font-mono font-bold text-sm text-ink break-all">
+                    {customerCCCD} {selectedProduct?.name} x{quantity}
+                  </span>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${customerCCCD} ${selectedProduct?.name} x${quantity}`);
+                      alert("Đã sao chép nội dung!");
+                    }}
+                    className="shrink-0 p-2 hover:bg-neutral-200 rounded-full transition-colors"
+                    title="Sao chép nội dung"
+                  >
+                    <CreditCard size={14} className="text-neutral-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 w-full mb-8">
+                <div className="text-left">
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Chủ tài khoản</p>
+                  <p className="text-xs font-bold">{config?.account_holder}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tài khoản</p>
+                  <p className="text-xs font-bold">{config?.account_no}</p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={resetForm} 
+                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
+              >
+                Xác nhận đã nhận tiền
+              </button>
             </motion.div>
           ) : showSuccess ? (
             <motion.div 

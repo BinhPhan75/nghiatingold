@@ -54,10 +54,12 @@ export const getVietQRUrl = (
   amount: number, 
   description: string
 ) => {
-  const template = 'qr_only'; // or 'compact', 'compact2'
+  // Use 'compact2' template to show account details and description on the image
+  const template = 'compact2'; 
   const encodedDesc = encodeURIComponent(description);
   const encodedName = encodeURIComponent(accountName);
   
+  // Adding size parameter (optional) for better clarity
   return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodedDesc}&accountName=${encodedName}`;
 };
 

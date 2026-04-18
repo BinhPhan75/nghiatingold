@@ -30,6 +30,10 @@ export interface Transaction {
   total_amount: number;
   created_at: string;
   created_by: string;
+  salesperson?: {
+    email: string;
+    full_name: string;
+  };
 }
 
 export interface SystemConfig {

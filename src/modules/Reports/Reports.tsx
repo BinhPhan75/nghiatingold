@@ -30,7 +30,7 @@ const Reports: React.FC = () => {
     setLoading(true);
     let query = supabase
       .from('transactions')
-      .select('*')
+      .select('*, salesperson:profiles!created_by(email, full_name)')
       .gte('created_at', `${startDate}T00:00:00`)
       .lte('created_at', `${endDate}T23:59:59`)
       .order('created_at', { ascending: false });
@@ -134,11 +134,11 @@ const Reports: React.FC = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-ink text-paper">
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Ngày Giờ</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Loại GD</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Đối tác (Người mua/bán)</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">Ngày/Giờ</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest text-center">Loại GD</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Đối tác (Khách hàng)</th>
                 <th className="p-4 font-black uppercase text-[10px] tracking-widest">Chi tiết mặt hàng</th>
-                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Số lượng</th>
+                <th className="p-4 font-black uppercase text-[10px] tracking-widest">Nhân viên</th>
                 <th className="p-4 font-black uppercase text-[10px] tracking-widest text-right">Tổng thanh toán</th>
               </tr>
             </thead>
@@ -154,11 +154,11 @@ const Reports: React.FC = () => {
               ) : (
                 transactions.map(t => (
                   <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
-                    <td className="p-4 font-mono text-[10px]">
-                      <div className="font-bold text-ink">{new Date(t.created_at).toLocaleDateString('vi-VN')}</div>
-                      <div className="text-neutral-400">{new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
+                    <td className="p-4 font-mono text-center">
+                      <div className="font-bold text-ink text-[11px]">{new Date(t.created_at).toLocaleDateString('vi-VN')}</div>
+                      <div className="text-neutral-400 text-[10px]">{new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 text-center">
                       <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-sm ${t.type === 'BUY' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-vcb-blue'}`}>
                         {t.type === 'BUY' ? 'MUA VÀO' : 'BÁN RA'}
                       </span>
@@ -167,15 +167,23 @@ const Reports: React.FC = () => {
                       <div className="text-[9px] text-neutral-400 font-black uppercase mb-1">
                         {t.type === 'BUY' ? 'Người bán (Khách)' : 'Người mua (Khách)'}
                       </div>
-                      <div className="text-sm font-bold uppercase truncate max-w-[200px]">{t.customer_name}</div>
+                      <div className="text-sm font-bold uppercase truncate max-w-[180px]">{t.customer_name}</div>
                       <div className="text-[10px] font-mono text-neutral-400">{t.customer_cccd}</div>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold italic text-ink">{t.product_name}</div>
-                      <div className="text-[9px] text-neutral-400">Đơn giá: {formatCurrency(t.price_per_unit)}</div>
+                      <div className="font-bold italic text-ink text-sm">{t.product_name}</div>
+                      <div className="text-[9px] text-neutral-400 flex items-center gap-1">
+                        SL: <span className="font-bold text-ink">{t.quantity} {t.unit}</span>
+                      </div>
                     </td>
-                    <td className="p-4 font-mono font-bold">{t.quantity} {t.unit}</td>
-                    <td className="p-4 font-mono font-black text-right">{formatCurrency(t.total_amount)}</td>
+                    <td className="p-4">
+                      <div className="text-xs font-bold text-ink">{t.salesperson?.full_name || 'Hệ thống'}</div>
+                      <div className="text-[9px] text-neutral-400 truncate max-w-[120px]">{t.salesperson?.email || 'N/A'}</div>
+                    </td>
+                    <td className="p-4 font-mono font-black text-right text-sm">
+                      <div className="text-[9px] text-neutral-400 mb-0.5">Đơn giá: {formatCurrency(t.price_per_unit)}</div>
+                      <div className="text-ink">{formatCurrency(t.total_amount)}</div>
+                    </td>
                   </tr>
                 ))
               )}
