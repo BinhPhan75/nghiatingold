@@ -106,17 +106,17 @@ drop policy if exists "Admin quản lý cấu hình" on system_config;
 
 -- 1. Profiles
 create policy "profiles_select_public" on profiles for select using (true);
-create policy "profiles_update_self" on profiles for update using (auth.uid() = id);
-create policy "profiles_all_anon" on profiles for all using (true); -- Allow all for custom login management
+create policy "profiles_update_self" on profiles for update using (auth.uid() = id) with check (auth.uid() = id);
+create policy "profiles_all_anon" on profiles for all using (true) with check (true);
 
 -- 2. Products
-create policy "products_all_anon" on products for all using (true);
+create policy "products_all_anon" on products for all using (true) with check (true);
 
 -- 3. Transactions 
-create policy "transactions_all_anon" on transactions for all using (true);
+create policy "transactions_all_anon" on transactions for all using (true) with check (true);
 
 -- 4. System Config
-create policy "config_all_anon" on system_config for all using (true);
+create policy "config_all_anon" on system_config for all using (true) with check (true);
 
 -- Function & Trigger
 create or replace function public.handle_new_user()

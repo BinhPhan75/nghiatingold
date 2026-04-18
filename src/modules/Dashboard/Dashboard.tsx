@@ -104,12 +104,32 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex flex-col gap-8">
       {lastError && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle size={18} className="text-red-500" />
-            <p className="text-xs text-red-700 font-medium">Lỗi kết nối database: {lastError.message || 'Không rõ nguyên nhân'}</p>
+        <div className="bg-red-50 border-l-4 border-red-500 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={24} className="text-red-500 shrink-0" />
+            <div>
+              <p className="text-sm text-red-800 font-bold uppercase mb-1">Lỗi kết nối dữ liệu</p>
+              <p className="text-xs text-red-700 font-medium">
+                {lastError.code === '42P01' 
+                  ? 'Database chưa có bảng (Table). Bạn cần copy nội dung file supabase-setup.sql và chạy trong SQL Editor của Supabase.'
+                  : (lastError.message || 'Không rõ nguyên nhân. Hãy kiểm tra internet hoặc cấu hình URL.')}
+              </p>
+              {lastError.code === '42P01' && (
+                <p className="text-[10px] text-red-600 mt-2 font-black italic underline underline-offset-4">
+                  * Vui lòng chạy SQL setup để tạo các bảng: profiles, products, transactions...
+                </p>
+              )}
+            </div>
           </div>
-          <button onClick={() => setLastError(null)} className="text-[10px] font-black uppercase text-red-500 hover:underline">Đóng</button>
+          <div className="flex gap-3 shrink-0">
+            <button 
+              onClick={() => { setLastError(null); fetchDashboardData(); }}
+              className="bg-red-600 text-white text-[10px] font-black uppercase px-4 py-2 hover:bg-red-700 transition-colors"
+            >
+              Thử lại
+            </button>
+            <button onClick={() => setLastError(null)} className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors">Đóng</button>
+          </div>
         </div>
       )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">

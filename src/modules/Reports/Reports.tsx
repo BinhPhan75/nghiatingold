@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Transaction, Product } from '../../types';
-import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -137,6 +137,32 @@ const Reports: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
+      {lastError && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={24} className="text-red-500 shrink-0" />
+            <div>
+              <p className="text-sm text-red-800 font-bold uppercase mb-1">Lỗi dữ liệu báo cáo</p>
+              <p className="text-xs text-red-700 font-medium">
+                {lastError.code === '42P01' 
+                  ? 'Database chưa có bảng (Table) cần thiết. Hãy chạy SQL setup.' 
+                  : (lastError.message || 'Có lỗi xảy ra khi tải báo cáo.')}
+              </p>
+              {lastError.code === '42P01' && (
+                <p className="text-[10px] text-red-600 mt-2 font-black italic">
+                  * Gợi ý: Copy file supabase-setup.sql chạy trong SQL Editor của Supabase Dashboard.
+                </p>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={() => { setLastError(null); fetchTransactions(); }}
+            className="bg-red-600 text-white text-[10px] font-black uppercase px-4 py-2 hover:bg-red-700 transition-colors shrink-0"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
       <div className="flex justify-between items-end mb-4">
         <div>
           <h1 className="text-4xl text-ink">Báo Cáo</h1>

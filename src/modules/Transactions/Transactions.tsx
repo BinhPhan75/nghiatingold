@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, AlertTriangle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -44,12 +44,19 @@ const Transactions: React.FC = () => {
   }, []);
 
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*');
+    const { data, error } = await supabase.from('products').select('*');
+    if (error) {
+      console.error("Products fetch error:", error);
+      setLastError(error);
+    }
     if (data) setProducts(data);
   };
 
   const fetchConfig = async () => {
-    const { data } = await supabase.from('system_config').select('*').single();
+    const { data, error } = await supabase.from('system_config').select('*').single();
+    if (error && error.code !== 'PGRST116') {
+      console.error("Config fetch error:", error);
+    }
     if (data) setConfig(data);
   };
 
@@ -178,6 +185,19 @@ const Transactions: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
+      {lastError && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={18} className="text-red-500" />
+            <p className="text-xs text-red-700 font-medium">
+              {lastError.code === '42P01' 
+                ? 'Lỗi: Bảng Products chưa tồn tại. Vui lòng chạy SQL setup.' 
+                : 'Lỗi đồng bộ dữ liệu: ' + (lastError.message || 'Không rõ nguyên nhân')}
+            </p>
+          </div>
+          <button onClick={() => setLastError(null)} className="text-[10px] font-black uppercase text-red-500 hover:underline">Đóng</button>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Transaction Control */}
       <motion.div 
