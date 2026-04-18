@@ -27,6 +27,13 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
 
   useEffect(() => {
+    const searchType = searchParams.get('type');
+    if (searchType === 'BUY' || searchType === 'SELL') {
+      setType(searchType);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     fetchProducts();
     fetchConfig();
   }, []);
@@ -48,13 +55,16 @@ const Transactions: React.FC = () => {
   const totalAmount = currentPrice * quantity;
 
   const handleScan = (data: string) => {
+    if (!data) return;
+    
     const info = parseCCCD(data);
     if (info) {
       setCustomerName(info.name);
       setCustomerCCCD(info.id);
       setShowScanner(false);
     } else {
-      alert("Mã QR không đúng định dạng CCCD");
+      console.warn("Mã QR không đúng định dạng CCCD:", data);
+      alert("Mã QR không đúng định dạng CCCD hoặc bị mờ. Vui lòng thử lại.");
     }
   };
 

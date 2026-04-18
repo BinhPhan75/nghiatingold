@@ -11,8 +11,13 @@ export interface CCCDInfo {
 }
 
 export const parseCCCD = (qrData: string): CCCDInfo | null => {
+  if (!qrData) return null;
   try {
-    const parts = qrData.split('|');
+    // Basic hygiene: remove potential whitespace
+    const cleanData = qrData.trim();
+    const parts = cleanData.split('|');
+    
+    // Vietnamese CCCD format usually has 7 parts
     if (parts.length < 6) return null;
 
     return {

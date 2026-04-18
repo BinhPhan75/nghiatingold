@@ -26,7 +26,12 @@ const System: React.FC = () => {
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showAddStaff, setShowAddStaff] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
+  const [newStaff, setNewStaff] = useState({ email: '', full_name: '', role: 'SALES' as UserRole });
+  const [restoring, setRestoring] = useState(false);
+  const [showRoleUpdate, setShowRoleUpdate] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<any>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -63,7 +68,37 @@ const System: React.FC = () => {
       .update({ [field]: value, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!error) fetchProducts();
+    if (error) {
+      setLastError(error);
+      console.error("Update Price Error:", error);
+    } else {
+      fetchProducts();
+    }
+  };
+
+  const handleUpdateRole = async (userId: string, newRole: UserRole) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', userId);
+
+    if (error) {
+      alert("Lỗi khi cập nhật quyền: " + error.message);
+    } else {
+      fetchProfiles();
+      setShowRoleUpdate(null);
+    }
+  };
+
+  const handleAddStaffProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaff.email) return;
+
+    // In a real app, you'd use supabase.auth.admin.createUser 
+    // but here we'll pre-insert a profile if the user signs up later
+    // or let the trigger handle it. For now, we provide clear instructions.
+    alert("Để thêm nhân viên: Hãy yêu cầu nhân viên đăng ký tài khoản bằng email: " + newStaff.email + ". Sau khi họ đăng ký, bạn có thể thay đổi quyền của họ tại đây.");
+    setShowAddStaff(false);
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -75,11 +110,14 @@ const System: React.FC = () => {
       .insert([newProduct]);
 
     if (!error) {
+      alert("Đã thêm mặt hàng thành công!");
       fetchProducts();
       setShowAddProduct(false);
       setNewProduct({ name: '', unit: '', buy_price: 0, sell_price: 0 });
     } else {
-      alert("Lỗi khi thêm mặt hàng");
+      setLastError(error);
+      console.error("Add Product Error:", error);
+      alert("Lỗi khi thêm mặt hàng: " + (error.message || "Kiểm tra console hoặc vùng thông báo lỗi bên dưới"));
     }
   };
 
@@ -109,16 +147,66 @@ const System: React.FC = () => {
       .eq('id', config.id);
 
     if (!error) alert("Đã cập nhật cấu hình hệ thống");
+    else alert("Lỗi khi lưu cấu hình: " + error.message);
   };
 
   const handleBackup = () => {
-    const data = { products, config, profiles, transactions: [] }; // Mock backup
+    const data = { products, config, profiles }; 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `nghiatin-gold-backup-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
+  };
+
+  const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("Hành động này sẽ ghi đè dữ liệu hiện tại (Mặt hàng & Cấu hình). Bạn có chắc chắn muốn tiếp tục?")) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        setRestoring(true);
+
+        // 1. Restore Products
+        if (data.products && Array.isArray(data.products)) {
+          // Clear current products first if admin
+          await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          const productsToInsert = data.products.map((p: any) => ({
+            name: p.name,
+            unit: p.unit,
+            buy_price: p.buy_price,
+            sell_price: p.sell_price,
+            updated_at: p.updated_at
+          }));
+          await supabase.from('products').insert(productsToInsert);
+        }
+
+        // 2. Restore Config
+        if (data.config) {
+          await supabase.from('system_config').update({
+            bank_name: data.config.bank_name,
+            account_no: data.config.account_no,
+            account_holder: data.config.account_holder,
+            bank_id: data.config.bank_id
+          }).eq('id', config?.id);
+        }
+
+        alert("Phục hồi dữ liệu thành công!");
+        fetchProducts();
+        fetchConfig();
+      } catch (err) {
+        console.error("Restore error:", err);
+        alert("Lỗi khi đọc file backup. Vui lòng kiểm tra lại định dạng file.");
+      } finally {
+        setRestoring(false);
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -140,6 +228,17 @@ const System: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {lastError && (
+        <div className="bg-red-900 text-white p-4 rounded-sm text-xs font-mono mb-4 flex justify-between items-start">
+          <div className="overflow-x-auto">
+            <p className="font-bold mb-1">CẢNH BÁO LỖI HỆ THỐNG (SUPABASE ERROR):</p>
+            <pre>{JSON.stringify(lastError, null, 2)}</pre>
+            <p className="mt-2 text-red-200">Lưu ý: Bạn CẦN copy nội dung file supabase-setup.sql và chạy trong mục SQL Editor của Supabase Dashboard để sửa lỗi quyền này.</p>
+          </div>
+          <button onClick={() => setLastError(null)} className="p-1 hover:bg-white/10"><X size={16} /></button>
+        </div>
+      )}
 
       <div className="bg-paper p-8 rounded-sm shadow-sm border border-neutral-100 min-h-[500px]">
         {activeTab === 'prices' && (
@@ -276,32 +375,72 @@ const System: React.FC = () => {
 
         {activeTab === 'users' && (
           <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center border-b border-neutral-100 pb-4 mb-4">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center border-b border-neutral-100 pb-4 mb-4 gap-4">
               <div className="flex items-center gap-3">
                 <Users className="text-gold-primary" />
                 <h3 className="text-xl">Quản lý nhân sự</h3>
               </div>
               {isAdmin && (
-                <button className="flex items-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-2 px-4 hover:bg-gold-primary hover:text-ink transition-all">
+                <button 
+                  onClick={() => setShowAddStaff(true)}
+                  className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all w-full md:w-auto"
+                >
                   <UserPlus size={16} /> Thêm nhân viên
                 </button>
               )}
             </div>
+
+            {showAddStaff && (
+              <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Quy trình thêm nhân viên</h4>
+                  <button onClick={() => setShowAddStaff(false)}><X size={18} /></button>
+                </div>
+                <div className="text-sm text-neutral-600 mb-4 bg-white p-4 border border-neutral-100 italic">
+                  <p className="mb-2">1. Yêu cầu nhân viên truy cập trang web và đăng ký tài khoản bằng email của họ.</p>
+                  <p>2. Sau khi họ đăng ký thành công, tên của họ sẽ xuất hiện trong danh sách bên dưới.</p>
+                  <p>3. Bạn quay lại đây và nhấn <strong>"Thay đổi quyền"</strong> để cấp quyền cho nhân viên đó.</p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {profiles.map(p => (
                 <div key={p.id} className="p-6 border border-neutral-100 rounded-sm relative overflow-hidden group">
                   <div className={`absolute top-0 right-0 w-20 h-20 -mr-10 -mt-10 rotate-45 opacity-10 transition-transform group-hover:scale-110 ${p.role === 'ADMIN' ? 'bg-red-500' : 'bg-gold-primary'}`}></div>
                   <div className="flex flex-col gap-1 mb-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}</span>
-                    <h4 className="text-lg font-bold lowercase italic">{p.full_name}</h4>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                      {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
+                    </span>
+                    <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
                   </div>
                   <div className="text-xs font-medium text-neutral-500 mb-6">
                     <p>{p.email}</p>
                     <p className="mt-1">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
                   </div>
-                  {isAdmin && (
-                    <button className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors">Chỉnh sửa</button>
+                  {isAdmin && p.email !== profile?.email && (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
+                        className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left"
+                      >
+                        {showRoleUpdate === p.id ? 'Hủy bỏ' : 'Thay đổi quyền'}
+                      </button>
+                      
+                      {showRoleUpdate === p.id && (
+                        <div className="flex gap-2 mt-2">
+                          {(['ADMIN', 'ACCOUNTANT', 'SALES'] as UserRole[]).map(roleOption => (
+                            <button
+                              key={roleOption}
+                              onClick={() => handleUpdateRole(p.id, roleOption)}
+                              className={`text-[9px] px-2 py-1 border ${p.role === roleOption ? 'bg-ink text-paper border-ink' : 'border-neutral-200 text-neutral-500'} hover:border-ink transition-all font-black uppercase`}
+                            >
+                              {roleOption}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -391,11 +530,20 @@ const System: React.FC = () => {
                 >
                   <Download size={20} /> Sao lưu dữ liệu
                 </button>
-                <button 
-                  className="flex-1 border border-neutral-200 py-4 px-6 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:border-ink transition-all"
-                >
-                  <Upload size={20} /> Phục hồi
-                </button>
+                <div className="flex-1 relative">
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    onChange={handleRestore}
+                    disabled={restoring}
+                  />
+                  <button 
+                    className={`w-full border border-neutral-200 py-4 px-6 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:border-ink transition-all ${restoring ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <Upload size={20} /> {restoring ? 'Đang phục hồi...' : 'Phục hồi'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
