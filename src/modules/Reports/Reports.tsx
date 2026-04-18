@@ -79,16 +79,16 @@ const Reports: React.FC = () => {
     }
   };
 
-  const totalBuy = transactions
+  const totalBuy = (transactions || [])
     .filter(t => t.type === 'BUY')
-    .reduce((sum, t) => sum + t.total_amount, 0);
+    .reduce((sum, t) => sum + (t.total_amount || 0), 0);
 
-  const totalSell = transactions
+  const totalSell = (transactions || [])
     .filter(t => t.type === 'SELL')
-    .reduce((sum, t) => sum + t.total_amount, 0);
+    .reduce((sum, t) => sum + (t.total_amount || 0), 0);
 
-  const totalCashAcross = transactions.reduce((sum, t) => sum + (t.tien_mat || 0), 0);
-  const totalTransferAcross = transactions.reduce((sum, t) => sum + (t.chuyen_khoan || 0), 0);
+  const totalCashAcross = (transactions || []).reduce((sum, t) => sum + (t.tien_mat || 0), 0);
+  const totalTransferAcross = (transactions || []).reduce((sum, t) => sum + (t.chuyen_khoan || 0), 0);
 
   const handleExport = () => {
     if (transactions.length === 0) {

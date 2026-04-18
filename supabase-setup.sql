@@ -107,19 +107,16 @@ drop policy if exists "Admin quản lý cấu hình" on system_config;
 -- 1. Profiles
 create policy "profiles_select_public" on profiles for select using (true);
 create policy "profiles_update_self" on profiles for update using (auth.uid() = id);
-create policy "profiles_admin_all" on profiles for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com' or auth.role() = 'anon');
+create policy "profiles_all_anon" on profiles for all using (true); -- Allow all for custom login management
 
 -- 2. Products
-create policy "products_select_auth" on products for select using (auth.role() = 'authenticated');
-create policy "products_update_auth" on products for update using (auth.role() = 'authenticated');
-create policy "products_admin_all" on products for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
+create policy "products_all_anon" on products for all using (true);
 
 -- 3. Transactions 
-create policy "transactions_all_auth" on transactions for all using (auth.role() = 'authenticated');
+create policy "transactions_all_anon" on transactions for all using (true);
 
 -- 4. System Config
-create policy "config_select_auth" on system_config for select using (auth.role() = 'authenticated');
-create policy "config_admin_all" on system_config for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
+create policy "config_all_anon" on system_config for all using (true);
 
 -- Function & Trigger
 create or replace function public.handle_new_user()

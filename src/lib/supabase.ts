@@ -1,14 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseKey);
+export const isSupabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-// Create a singleton client or a dummy one to avoid crashes during static analysis/initial load
-export const supabase: SupabaseClient = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseKey)
-  : {} as SupabaseClient;
+// Create a client. If configured is false, it uses dummy values to avoid crashes on startup
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
 export const getSupabase = () => {
   if (!isSupabaseConfigured) {

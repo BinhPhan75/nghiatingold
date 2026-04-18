@@ -34,7 +34,7 @@ const Dashboard: React.FC = () => {
       .select('*')
       .gte('created_at', `${today}T00:00:00`);
 
-    if (transactions) {
+    if (transactions && Array.isArray(transactions)) {
       const buy = transactions.filter(t => t.type === 'BUY');
       const sell = transactions.filter(t => t.type === 'SELL');
 
@@ -48,14 +48,18 @@ const Dashboard: React.FC = () => {
       // Pie data: weight by product for BUY
       const buyMap: Record<string, number> = {};
       buy.forEach(t => {
-        buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
+        if (t.product_name) {
+          buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
+        }
       });
       setBuyPieData(Object.entries(buyMap).map(([name, value]) => ({ name, value })));
 
       // Pie data: weight by product for SELL
       const sellMap: Record<string, number> = {};
       sell.forEach(t => {
-        sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
+        if (t.product_name) {
+          sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
+        }
       });
       setSellPieData(Object.entries(sellMap).map(([name, value]) => ({ name, value })));
 
@@ -67,11 +71,17 @@ const Dashboard: React.FC = () => {
       transactions.forEach(t => {
         const h = new Date(t.created_at).getHours();
         if (hourlyMap[h]) {
-          if (t.type === 'BUY') hourlyMap[h].buy += t.total_amount;
-          else hourlyMap[h].sell += t.total_amount;
+          if (t.type === 'BUY') hourlyMap[h].buy += (t.total_amount || 0);
+          else hourlyMap[h].sell += (t.total_amount || 0);
         }
       });
       setHourlyData(Object.values(hourlyMap));
+    } else {
+      // Fallback clean state if error or no data
+      setStats({ buyTotal: 0, sellTotal: 0, buyCount: 0, sellCount: 0 });
+      setBuyPieData([]);
+      setSellPieData([]);
+      setHourlyData([]);
     }
 
     const { data: pData } = await supabase.from('products').select('*');
