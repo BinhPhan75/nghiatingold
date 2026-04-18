@@ -20,9 +20,13 @@ const MainLayout: React.FC = () => {
     { to: '/system', icon: Settings, label: 'HT', roles: ['ADMIN', 'SALES'] },
   ];
 
-  // Fix: Show menus even while profile is loading to prevent empty sidebar
-  const activeRole = profile?.role || 'SALES'; // Default to SALES during load or if missing
-  const filteredNavItems = navItems.filter(item => item.roles.includes(activeRole));
+  // Fix: Show menus based on role booleans from AuthContext
+  const filteredNavItems = navItems.filter(item => {
+    if (isAdmin && item.roles.includes('ADMIN')) return true;
+    if (isAccountant && item.roles.includes('ACCOUNTANT')) return true;
+    if (isSales && item.roles.includes('SALES')) return true;
+    return false;
+  });
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-ink overflow-hidden text-ink">

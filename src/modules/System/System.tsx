@@ -6,7 +6,7 @@ import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, P
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup'>('prices');
 
   const tabs = [
@@ -16,7 +16,10 @@ const System: React.FC = () => {
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
   ];
 
-  const filteredTabs = tabs.filter(t => t.roles.includes(profile?.role || ''));
+  const filteredTabs = tabs.filter(t => {
+    if (isAdmin) return true; // Admins always see all tabs
+    return t.roles.includes(profile?.role || '');
+  });
   
   // Data State
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,7 +32,7 @@ const System: React.FC = () => {
     fetchProducts();
     fetchConfig();
     if (isAdmin || activeTab === 'users') fetchProfiles();
-  }, [activeTab]);
+  }, [activeTab, isAdmin]);
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').order('name');
@@ -45,6 +48,14 @@ const System: React.FC = () => {
     const { data } = await supabase.from('profiles').select('*').order('role');
     if (data) setProfiles(data);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-20 italic text-neutral-400 font-bold">
+        Đang xác thực quyền hạn...
+      </div>
+    );
+  }
 
   const handleUpdatePrice = async (id: string, field: 'buy_price' | 'sell_price', value: number) => {
     const { error } = await supabase
@@ -133,7 +144,7 @@ const System: React.FC = () => {
       <div className="bg-paper p-8 rounded-sm shadow-sm border border-neutral-100 min-h-[500px]">
         {activeTab === 'prices' && (
           <div className="flex flex-col gap-6">
-            <div className="flex justify-between items-center border-b border-neutral-100 pb-4 mb-4">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center border-b border-neutral-100 pb-4 mb-4 gap-4">
               <div className="flex items-center gap-3">
                 <Tag className="text-gold-primary" />
                 <h3 className="text-xl">Điều chỉnh giá niêm yết</h3>
@@ -141,12 +152,19 @@ const System: React.FC = () => {
               {isAdmin && (
                 <button 
                   onClick={() => setShowAddProduct(true)}
-                  className="flex items-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-2 px-4 hover:bg-gold-primary hover:text-ink transition-all"
+                  className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all w-full md:w-auto"
                 >
                   <Plus size={16} /> Thêm mặt hàng
                 </button>
               )}
             </div>
+
+            {!isAdmin && (
+              <div className="bg-amber-50 p-4 border-l-4 border-amber-400 flex items-center gap-3 italic text-[11px] text-amber-700">
+                <ShieldCheck size={18} className="text-amber-400 shrink-0" />
+                Lưu ý: Bạn đang ở quyền nhân viên (Sales/Accountant). Chỉ quyền ADMIN mới có thể Thêm/Xóa mặt hàng. Bạn hiện chỉ được phép điều chỉnh giá.
+              </div>
+            )}
 
             {showAddProduct && (
               <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">

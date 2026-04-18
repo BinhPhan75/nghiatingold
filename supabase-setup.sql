@@ -76,11 +76,19 @@ create policy "Admin can update config" on system_config
   for update using (exists (select 1 from profiles where id = auth.uid() and role = 'ADMIN'));
 
 -- Trigger for profile on user signup
-create function public.handle_new_user()
+create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+  default_role text;
 begin
+  if new.email = 'binhphan.070582@gmail.com' then
+    default_role := 'ADMIN';
+  else
+    default_role := 'SALES';
+  end if;
+
   insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'SALES');
+  values (new.id, new.email, new.raw_user_meta_data->>'full_name', default_role);
   return new;
 end;
 $$ language plpgsql security definer;
@@ -96,4 +104,4 @@ insert into products (name, unit, buy_price, sell_price) values
 ('Vàng Trang Sức 18K', 'Chỉ', 4500000, 5200000);
 
 insert into system_config (bank_name, bank_id, account_no, account_holder) values
-('Vietcombank', 'VCB', '1234567890', 'DOANH NGHIEP KIM HOAN PRO');
+('Vietcombank', 'VCB', '1234567890', 'DOANH NGHIEP NGHIATIN GOLD');
