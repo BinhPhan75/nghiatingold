@@ -61,25 +61,36 @@ const Transactions: React.FC = () => {
   const currentPrice = customPrice;
   const totalAmount = currentPrice * quantity;
 
-  const handleScan = (data: string) => {
+  const handleScan = (data: string | any) => {
     if (!data) return;
     
     console.log("Dữ liệu quét được:", data);
-    const info = parseCCCD(data);
     
-    if (info) {
-      setCustomerName(info.name);
-      setCustomerCCCD(info.id);
+    // Case 1: Data is an object from AI analysis
+    if (typeof data === 'object' && data.id && data.name) {
+      setCustomerName(data.name);
+      setCustomerCCCD(data.id);
       setShowScanner(false);
       setLastError(null);
-    } else {
-      console.warn("Mã QR không đúng định dạng CCCD chuẩn:", data);
-      // Give more specific feedback
-      const parts = data.split('|');
-      if (parts.length > 2) {
-        alert(`Dữ liệu quét được: "${data.substring(0, 30)}..." không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
+      return;
+    }
+
+    // Case 2: Data is a string from QR scan
+    if (typeof data === 'string') {
+      const info = parseCCCD(data);
+      if (info) {
+        setCustomerName(info.name);
+        setCustomerCCCD(info.id);
+        setShowScanner(false);
+        setLastError(null);
       } else {
-        alert("Không nhận diện được nội dung CCCD. Vui lòng đảm bảo bạn đang quét mã QR ở góc trên cùng bên phải của thẻ CCCD gắn chip.");
+        console.warn("Mã QR không đúng định dạng CCCD chuẩn:", data);
+        const parts = data.split('|');
+        if (parts.length > 2) {
+          alert(`Dữ liệu quét được: "${data.substring(0, 30)}..." không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
+        } else {
+          alert("Không nhận diện được nội dung CCCD. Vui lòng đảm bảo bạn đang quét mã QR ở góc trên cùng bên phải của thẻ CCCD gắn chip.");
+        }
       }
     }
   };

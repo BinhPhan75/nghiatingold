@@ -1,53 +1,58 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { CCCDInfo } from "../lib/utils";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY || '' 
+});
 
-export interface CCCDInfo {
-  id: string;
-  fullName: string;
-  dob: string;
-  address: string;
-}
-
-export async function scanCCCD(base64Image: string): Promise<CCCDInfo | null> {
+export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | null> => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64Image,
-              mimeType: "image/jpeg",
+      contents: [
+        {
+          parts: [
+            {
+              text: "Trích xuất thông tin từ thẻ Căn cước công dân (CCCD) Việt Nam trong hình ảnh này. Trả về định dạng JSON chính xác với các trường: id (số CCCD), name (họ tên), dob (ngày sinh DD/MM/YYYY), gender (Nam/Nữ), address (nơi thường trú). Chỉ trả về JSON, không giải thích thêm."
             },
-          },
-          {
-            text: "Đây là ảnh thẻ căn cước công dân Việt Nam (CCCD). Hãy trích xuất các thông tin sau: Số CCCD, Họ và tên, Ngày sinh, Quê quán/Địa chỉ thường trú. Trả về dưới dạng JSON.",
-          },
-        ],
-      },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Image.split(',')[1] || base64Image
+              }
+            }
+          ]
+        }
+      ],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            id: { type: Type.STRING, description: "Số căn cước công dân" },
-            fullName: { type: Type.STRING, description: "Họ và tên đầy đủ" },
-            dob: { type: Type.STRING, description: "Ngày tháng năm sinh" },
-            address: { type: Type.STRING, description: "Địa chỉ thường trú hoặc quê quán" },
+            id: { type: Type.STRING },
+            name: { type: Type.STRING },
+            dob: { type: Type.STRING },
+            gender: { type: Type.STRING },
+            address: { type: Type.STRING }
           },
-          required: ["id", "fullName", "dob", "address"],
-        },
-      },
+          required: ["id", "name"]
+        }
+      }
     });
 
-    const text = response.text;
-    if (text) {
-      return JSON.parse(text) as CCCDInfo;
+    const result = JSON.parse(response.text || '{}');
+    if (result.id && result.name) {
+      return {
+        id: result.id,
+        name: result.name,
+        dob: result.dob || '',
+        gender: result.gender || '',
+        address: result.address || ''
+      };
     }
     return null;
   } catch (error) {
-    console.error("Error scanning CCCD:", error);
+    console.error("AI Analysis Error:", error);
     return null;
   }
-}
+};
