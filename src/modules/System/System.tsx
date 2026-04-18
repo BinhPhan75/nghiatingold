@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product, SystemConfig, Profile, UserRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X } from 'lucide-react';
+import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
@@ -34,6 +34,7 @@ const System: React.FC = () => {
   const [lastError, setLastError] = useState<any>(null);
 
   useEffect(() => {
+    setLastError(null);
     fetchProducts();
     fetchConfig();
     if (isAdmin || activeTab === 'users') fetchProfiles();
@@ -61,6 +62,9 @@ const System: React.FC = () => {
       </div>
     );
   }
+
+  const { user } = useAuth();
+  const currentUserEmail = user?.email;
 
   const handleUpdatePrice = async (id: string, field: 'buy_price' | 'sell_price', value: number) => {
     const { error } = await supabase
@@ -230,13 +234,27 @@ const System: React.FC = () => {
       </div>
 
       {lastError && (
-        <div className="bg-red-900 text-white p-4 rounded-sm text-xs font-mono mb-4 flex justify-between items-start">
-          <div className="overflow-x-auto">
-            <p className="font-bold mb-1">CẢNH BÁO LỖI HỆ THỐNG (SUPABASE ERROR):</p>
-            <pre>{JSON.stringify(lastError, null, 2)}</pre>
-            <p className="mt-2 text-red-200">Lưu ý: Bạn CẦN copy nội dung file supabase-setup.sql và chạy trong mục SQL Editor của Supabase Dashboard để sửa lỗi quyền này.</p>
+        <div className="bg-red-900/90 text-white p-6 rounded-sm text-xs font-mono mb-6 flex justify-between items-start backdrop-blur-sm border-l-4 border-red-500 shadow-xl">
+          <div className="overflow-x-auto w-full">
+            <p className="font-bold mb-3 text-sm flex items-center gap-2">
+              <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (SUPABASE ERROR):
+            </p>
+            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
+            </div>
+            <div className="bg-white/10 p-4 rounded text-red-100">
+              <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
+              <ul className="list-disc ml-4 space-y-1">
+                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
+                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
+              </ul>
+              <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
+            </div>
           </div>
-          <button onClick={() => setLastError(null)} className="p-1 hover:bg-white/10"><X size={16} /></button>
+          <button onClick={() => setLastError(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4 focus:outline-none">
+            <X size={20} />
+          </button>
         </div>
       )}
 

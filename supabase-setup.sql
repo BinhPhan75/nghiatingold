@@ -52,50 +52,56 @@ alter table products enable row level security;
 alter table transactions enable row level security;
 alter table system_config enable row level security;
 
--- Clear existing policies to avoid duplicates
+-- Clear existing policies to avoid duplicates and RECURSION errors
+-- Note: We drop ALL possible names we might have used in previous turns
 drop policy if exists "Public profiles are viewable by authenticated users" on profiles;
 drop policy if exists "Users can update their own profile" on profiles;
 drop policy if exists "Admins can manage all profiles" on profiles;
+drop policy if exists "Admins can do everything on profiles" on profiles;
+drop policy if exists "Admins can manage profiles" on profiles;
+drop policy if exists "Profiles are viewable by authenticated" on profiles;
+drop policy if exists "Xem profile" on profiles;
+drop policy if exists "Sửa profile cá nhân" on profiles;
+drop policy if exists "Admin tối cao" on profiles;
+
 drop policy if exists "Products are viewable by all authenticated" on products;
 drop policy if exists "All users can update prices" on products;
 drop policy if exists "Admins can manage products" on products;
+drop policy if exists "Products viewable by all" on products;
+drop policy if exists "Staff can update prices" on products;
+drop policy if exists "Xem sản phẩm" on products;
+drop policy if exists "Admin quản lý sản phẩm" on products;
+drop policy if exists "Nhân viên cập nhật giá" on products;
+
 drop policy if exists "Transactions are viewable/insertable by authenticated" on transactions;
+drop policy if exists "Quản lý giao dịch" on transactions;
+
 drop policy if exists "System config viewable by all" on system_config;
 drop policy if exists "Admins can manage config" on system_config;
+drop policy if exists "Config viewable by all" on system_config;
+drop policy if exists "Admin can update config" on system_config;
+drop policy if exists "Xem cấu hình" on system_config;
+drop policy if exists "Admin quản lý cấu hình" on system_config;
 
--- Re-create Policies
-create policy "Public profiles are viewable by authenticated users" on profiles
-  for select using (auth.role() = 'authenticated');
+-- Re-create Policies (Clean & Non-Recursive)
+-- Use auth.jwt() email directly for admin privilege to avoid "Infinite Recursion"
 
-create policy "Users can update their own profile" on profiles
-  for update using (auth.uid() = id);
+-- 1. Profiles
+create policy "profiles_select_auth" on profiles for select using (auth.role() = 'authenticated');
+create policy "profiles_update_self" on profiles for update using (auth.uid() = id);
+create policy "profiles_admin_all" on profiles for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
-create policy "Admins can manage all profiles" on profiles
-  for all using (
-    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
-  );
+-- 2. Products
+create policy "products_select_auth" on products for select using (auth.role() = 'authenticated');
+create policy "products_update_auth" on products for update using (auth.role() = 'authenticated');
+create policy "products_admin_all" on products for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
-create policy "Products are viewable by all authenticated" on products
-  for select using (auth.role() = 'authenticated');
+-- 3. Transactions 
+create policy "transactions_all_auth" on transactions for all using (auth.role() = 'authenticated');
 
-create policy "All users can update prices" on products
-  for update using (auth.role() = 'authenticated');
-
-create policy "Admins can manage products" on products
-  for all using (
-    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
-  );
-
-create policy "Transactions are viewable/insertable by authenticated" on transactions
-  using (auth.role() = 'authenticated');
-
-create policy "System config viewable by all" on system_config
-  for select using (auth.role() = 'authenticated');
-
-create policy "Admins can manage config" on system_config
-  for all using (
-    (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com')
-  );
+-- 4. System Config
+create policy "config_select_auth" on system_config for select using (auth.role() = 'authenticated');
+create policy "config_admin_all" on system_config for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
 -- Function & Trigger
 create or replace function public.handle_new_user()
