@@ -25,6 +25,7 @@ const System: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [editingPrices, setEditingPrices] = useState<Record<string, { buy_price: number; sell_price: number }>>({});
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
@@ -42,7 +43,14 @@ const System: React.FC = () => {
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').order('name');
-    if (data) setProducts(data);
+    if (data) {
+      setProducts(data);
+      const initialEditing: Record<string, { buy_price: number; sell_price: number }> = {};
+      data.forEach(p => {
+        initialEditing[p.id] = { buy_price: p.buy_price, sell_price: p.sell_price };
+      });
+      setEditingPrices(initialEditing);
+    }
   };
 
   const fetchConfig = async () => {
@@ -66,15 +74,22 @@ const System: React.FC = () => {
   const { user } = useAuth();
   const currentUserEmail = user?.email;
 
-  const handleUpdatePrice = async (id: string, field: 'buy_price' | 'sell_price', value: number) => {
+  const handleRowSave = async (id: string) => {
+    const edited = editingPrices[id];
+    if (!edited) return;
+
     const { error } = await supabase
       .from('products')
-      .update({ [field]: value, updated_at: new Date().toISOString() })
+      .update({ 
+        buy_price: edited.buy_price, 
+        sell_price: edited.sell_price,
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id);
 
     if (error) {
       setLastError(error);
-      console.error("Update Price Error:", error);
+      console.error("Save Price Error:", error);
     } else {
       fetchProducts();
     }
@@ -354,33 +369,48 @@ const System: React.FC = () => {
                       <td className="py-4">
                         <input 
                           type="number" 
-                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
-                          defaultValue={p.buy_price} 
-                          onBlur={(e) => handleUpdatePrice(p.id, 'buy_price', Number(e.target.value))}
+                          className="w-full md:w-32 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          value={editingPrices[p.id]?.buy_price ?? p.buy_price} 
+                          onChange={(e) => setEditingPrices(prev => ({
+                            ...prev,
+                            [p.id]: { ...prev[p.id], buy_price: Number(e.target.value) }
+                          }))}
                         />
                       </td>
                       <td className="py-4">
                         <input 
                           type="number" 
-                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
-                          defaultValue={p.sell_price} 
-                          onBlur={(e) => handleUpdatePrice(p.id, 'sell_price', Number(e.target.value))}
+                          className="w-full md:w-32 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          value={editingPrices[p.id]?.sell_price ?? p.sell_price} 
+                          onChange={(e) => setEditingPrices(prev => ({
+                            ...prev,
+                            [p.id]: { ...prev[p.id], sell_price: Number(e.target.value) }
+                          }))}
                         />
                       </td>
                       <td className="py-4 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[9px] font-mono text-neutral-400 block">
-                            {new Date(p.updated_at).toLocaleString('vi-VN')}
-                          </span>
-                          {isAdmin && (
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => handleDeleteProduct(p.id)}
-                              className="text-red-400 hover:text-red-600 transition-colors"
-                              title="Xóa mặt hàng"
+                              onClick={() => handleRowSave(p.id)}
+                              className="bg-ink text-paper text-[9px] font-black uppercase px-3 py-1.5 hover:bg-gold-primary hover:text-ink transition-all flex items-center gap-1"
+                              title="Lưu thay đổi"
                             >
-                              <Trash2 size={16} />
+                              <Save size={12} /> Lưu
                             </button>
-                          )}
+                            {isAdmin && (
+                              <button 
+                                onClick={() => handleDeleteProduct(p.id)}
+                                className="text-red-400 hover:text-red-600 transition-colors p-1"
+                                title="Xóa mặt hàng"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-mono text-neutral-400 block">
+                            Cập nhật: {new Date(p.updated_at).toLocaleString('vi-VN')}
+                          </span>
                         </div>
                       </td>
                     </tr>
