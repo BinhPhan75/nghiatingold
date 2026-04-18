@@ -16,8 +16,8 @@ const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Map 'admin' username to 'admin@kimhoan.vn' as Supabase requires email
-    const loginEmail = email.toLowerCase() === 'admin' ? 'admin@kimhoan.vn' : email;
+    // Map 'admin' username to 'binhphan.070582@gmail.com' as Supabase requires email
+    const loginEmail = email.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : email;
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -26,7 +26,7 @@ const Login: React.FC = () => {
 
     if (authError) {
       if (authError.message.includes('Invalid login credentials') && email.toLowerCase() === 'admin' && password === '220785') {
-        setError('Tài khoản ADMIN chưa được khởi tạo trong Supabase. Vui lòng tạo tài khoản admin@kimhoan.vn với pass 220785 trong Supabase Dashboard.');
+        setError('Tài khoản ADMIN chưa được khởi tạo trong Supabase. Vui lòng tạo tài khoản binhphan.070582@gmail.com với mật khẩu 220785 trong Supabase Dashboard.');
       } else {
         setError('Thông tin đăng nhập không chính xác');
       }
@@ -65,7 +65,7 @@ const Login: React.FC = () => {
               type="email" 
               value={email} 
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@kimhoan.vn"
+              placeholder="binhphan.070582@gmail.com"
               required
             />
           </div>
