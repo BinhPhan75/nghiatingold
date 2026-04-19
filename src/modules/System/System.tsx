@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Product, SystemConfig, Profile, UserRole } from '../../types';
+import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle } from 'lucide-react';
+import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
@@ -26,10 +26,13 @@ const System: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [editingPrices, setEditingPrices] = useState<Record<string, { buy_price: number; sell_price: number }>>({});
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
+  const [showAddBank, setShowAddBank] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
+  const [newBank, setNewBank] = useState({ short_name: '', full_name: '', bin: '' });
   const [restoring, setRestoring] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState<string | null>(null);
   const [lastError, setLastError] = useState<any>(null);
@@ -41,6 +44,7 @@ const System: React.FC = () => {
     setLastError(null);
     fetchProducts();
     fetchConfig();
+    fetchBanks();
     if (isAdmin || activeTab === 'users') fetchProfiles();
     if (activeTab === 'diagnostics') checkConnection();
   }, [activeTab, isAdmin]);
@@ -80,8 +84,13 @@ const System: React.FC = () => {
   };
 
   const fetchProfiles = async () => {
-    const { data: snapshot } = await supabase.from('profiles').select('*').order('role');
+    const { data: snapshot } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (snapshot) setProfiles(snapshot);
+  };
+
+  const fetchBanks = async () => {
+    const { data: snapshot } = await supabase.from('banks').select('*').order('short_name');
+    if (snapshot) setBanks(snapshot);
   };
 
   if (authLoading) {
@@ -131,6 +140,56 @@ const System: React.FC = () => {
       setShowRoleUpdate(null);
     } catch (error: any) {
       alert("Lỗi khi cập nhật quyền: " + error.message);
+    }
+  };
+
+  const handleUpdateStatus = async (userId: string, newStatus: UserStatus) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('id', userId);
+
+      if (error) throw error;
+      alert("Đã cập nhật trạng thái nhân viên thành công!");
+      fetchProfiles();
+    } catch (error: any) {
+      alert("Lỗi khi cập nhật trạng thái: " + error.message);
+    }
+  };
+
+  const handleAddBank = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBank.short_name || !newBank.bin) return;
+
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .insert([newBank]);
+
+      if (error) throw error;
+      alert("Đã thêm ngân hàng thành công!");
+      fetchBanks();
+      setShowAddBank(false);
+      setNewBank({ short_name: '', full_name: '', bin: '' });
+    } catch (error: any) {
+      alert("Lỗi khi thêm ngân hàng: " + error.message);
+    }
+  };
+
+  const handleDeleteBank = async (id: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa ngân hàng này?")) return;
+
+    try {
+      const { error } = await supabase
+        .from('banks')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchBanks();
+    } catch (error: any) {
+      alert("Lỗi khi xóa ngân hàng: " + error.message);
     }
   };
 
@@ -465,17 +524,52 @@ const System: React.FC = () => {
                 <div key={p.id} className="p-6 border border-neutral-100 rounded-sm relative overflow-hidden group">
                   <div className={`absolute top-0 right-0 w-20 h-20 -mr-10 -mt-10 rotate-45 opacity-10 transition-transform group-hover:scale-110 ${p.role === 'ADMIN' ? 'bg-red-500' : 'bg-gold-primary'}`}></div>
                   <div className="flex flex-col gap-1 mb-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
-                      {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
-                    </span>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+                        {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
+                      </span>
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                        p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                        p.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {p.status}
+                      </span>
+                    </div>
                     <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
                   </div>
                   <div className="text-xs font-medium text-neutral-500 mb-6">
-                    <p>{p.email}</p>
+                    <p className="truncate" title={p.email}>{p.email}</p>
                     <p className="mt-1">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
                   </div>
                   {isAdmin && p.email !== profile?.email && (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex gap-2">
+                        {p.status === 'PENDING' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
+                            className="bg-green-600 text-white px-3 py-1.5 rounded-sm text-[9px] font-black uppercase hover:bg-green-700 flex items-center gap-1"
+                          >
+                            <UserCheck size={12} /> Duyệt tài khoản
+                          </button>
+                        )}
+                        {p.status === 'APPROVED' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(p.id, 'BLOCKED')}
+                            className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-red-100"
+                          >
+                            Khóa
+                          </button>
+                        )}
+                        {p.status === 'BLOCKED' && (
+                          <button 
+                            onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
+                            className="text-green-500 hover:bg-green-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-green-100"
+                          >
+                            Mở khóa
+                          </button>
+                        )}
+                      </div>
+
                       <button 
                         onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
                         className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left"
@@ -484,7 +578,7 @@ const System: React.FC = () => {
                       </button>
                       
                       {showRoleUpdate === p.id && (
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex gap-2 mt-1">
                           {(['ADMIN', 'ACCOUNTANT', 'SALES'] as UserRole[]).map(roleOption => (
                             <button
                               key={roleOption}
@@ -512,63 +606,159 @@ const System: React.FC = () => {
         )}
 
         {activeTab === 'bank' && (
-          <div className="flex flex-col gap-6 max-w-xl">
-            <div className="flex items-center gap-3 border-b border-neutral-100 pb-4 mb-4">
-              <Building2 className="text-gold-primary" />
-              <h3 className="text-xl">Tài khoản doanh nghiệp</h3>
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-6 max-w-xl">
+              <div className="flex items-center gap-3 border-b border-neutral-100 pb-4 mb-4">
+                <Building2 className="text-gold-primary" />
+                <h3 className="text-xl">Tài khoản doanh nghiệp</h3>
+              </div>
+
+              {config && (
+                <form onSubmit={handleUpdateConfig} className="flex flex-col gap-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="input-field">
+                      <label>Ngân hàng</label>
+                      <input 
+                        type="text" 
+                        value={config.bank_name} 
+                        onChange={e => setConfig({...config, bank_name: e.target.value})}
+                      />
+                    </div>
+                    <div className="input-field">
+                      <label>Mã Bank (VietQR ID)</label>
+                      <input 
+                        type="text" 
+                        value={config.bank_id} 
+                        placeholder="VCB, ICB, etc."
+                        onChange={e => setConfig({...config, bank_id: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="input-field">
+                    <label>Số tài khoản</label>
+                    <input 
+                      type="text" 
+                      value={config.account_no} 
+                      onChange={e => setConfig({...config, account_no: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="input-field">
+                    <label>Chủ tài khoản</label>
+                    <input 
+                      type="text" 
+                      value={config.account_holder} 
+                      onChange={e => setConfig({...config, account_holder: e.target.value})}
+                    />
+                  </div>
+
+                  {isAdmin ? (
+                    <button type="submit" className="vcb-btn flex items-center justify-center gap-2">
+                      <Save size={18} /> Lưu cấu hình
+                    </button>
+                  ) : (
+                    <div className="bg-neutral-50 p-4 border-l-4 border-neutral-300 italic text-xs text-neutral-600">
+                      Bạn không có quyền thay đổi thông tin tài khoản ngân hàng.
+                    </div>
+                  )}
+                </form>
+              )}
             </div>
 
-            {config && (
-              <form onSubmit={handleUpdateConfig} className="flex flex-col gap-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="input-field">
-                    <label>Ngân hàng</label>
-                    <input 
-                      type="text" 
-                      value={config.bank_name} 
-                      onChange={e => setConfig({...config, bank_name: e.target.value})}
-                    />
-                  </div>
-                  <div className="input-field">
-                    <label>Mã Bank (VietQR ID)</label>
-                    <input 
-                      type="text" 
-                      value={config.bank_id} 
-                      placeholder="VCB, ICB, etc."
-                      onChange={e => setConfig({...config, bank_id: e.target.value})}
-                    />
-                  </div>
+            <div className="pt-8 border-t border-neutral-100">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="text-gold-primary" />
+                  <h3 className="text-xl">Danh sách ngân hàng liên kết</h3>
                 </div>
-
-                <div className="input-field">
-                  <label>Số tài khoản</label>
-                  <input 
-                    type="text" 
-                    value={config.account_no} 
-                    onChange={e => setConfig({...config, account_no: e.target.value})}
-                  />
-                </div>
-
-                <div className="input-field">
-                  <label>Chủ tài khoản</label>
-                  <input 
-                    type="text" 
-                    value={config.account_holder} 
-                    onChange={e => setConfig({...config, account_holder: e.target.value})}
-                  />
-                </div>
-
-                {isAdmin ? (
-                  <button type="submit" className="vcb-btn flex items-center justify-center gap-2">
-                    <Save size={18} /> Lưu cấu hình
+                {isAdmin && (
+                  <button 
+                    onClick={() => setShowAddBank(true)}
+                    className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all"
+                  >
+                    <Plus size={16} /> Thêm ngân hàng
                   </button>
-                ) : (
-                  <div className="bg-neutral-50 p-4 border-l-4 border-neutral-300 italic text-xs text-neutral-600">
-                    Bạn không có quyền thay đổi thông tin tài khoản ngân hàng.
-                  </div>
                 )}
-              </form>
-            )}
+              </div>
+
+              {showAddBank && (
+                <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm max-w-2xl">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-sm font-black uppercase tracking-widest text-ink">Thêm ngân hàng mới</h4>
+                    <button onClick={() => setShowAddBank(false)}><X size={18} /></button>
+                  </div>
+                  <form onSubmit={handleAddBank} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="input-field">
+                      <label>Tên viết tắt (VCB, ...)</label>
+                      <input 
+                        type="text" 
+                        value={newBank.short_name}
+                        onChange={e => setNewBank({...newBank, short_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="input-field">
+                      <label>Tên đầy đủ</label>
+                      <input 
+                        type="text" 
+                        value={newBank.full_name}
+                        onChange={e => setNewBank({...newBank, full_name: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="input-field">
+                      <label>Mã BIN (970436, ...)</label>
+                      <input 
+                        type="text" 
+                        value={newBank.bin}
+                        onChange={e => setNewBank({...newBank, bin: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-3 flex justify-end">
+                      <button type="submit" className="bg-ink text-paper py-2 px-8 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary transition-all">
+                        Lưu ngân hàng
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b-2 border-ink">
+                      <th className="py-4 font-black uppercase text-[10px] tracking-widest text-neutral-400">Ngân hàng</th>
+                      <th className="py-4 font-black uppercase text-[10px] tracking-widest text-neutral-400">Tên đầy đủ</th>
+                      <th className="py-4 font-black uppercase text-[10px] tracking-widest text-neutral-400">Mã BIN</th>
+                      <th className="py-4 font-black uppercase text-[10px] tracking-widest text-neutral-400 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {banks.map(bank => (
+                      <tr key={bank.id} className="border-b border-neutral-100">
+                        <td className="py-4 font-bold">{bank.short_name}</td>
+                        <td className="py-4 text-sm">{bank.full_name}</td>
+                        <td className="py-4 font-mono text-sm">{bank.bin}</td>
+                        <td className="py-4 text-right">
+                          {isAdmin && (
+                            <button onClick={() => handleDeleteBank(bank.id)} className="text-red-400 hover:text-red-600">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {banks.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-neutral-400 italic">Chưa có ngân hàng nào được thiết lập</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

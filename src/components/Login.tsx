@@ -5,31 +5,71 @@ import { Briefcase, LogIn, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const Login: React.FC = () => {
+  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     // Map 'admin' username to 'binhphan.070582@gmail.com'
     const loginEmail = email.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : email;
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password,
-    });
+    if (isRegister) {
+      const { data, error: registerError } = await supabase.auth.signUp({
+        email: loginEmail,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          }
+        }
+      });
 
-    if (authError) {
-      setError('Thông tin đăng nhập không chính xác');
-      setLoading(false);
+      if (registerError) {
+        setError(registerError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Create profile
+        const { error: profileError } = await supabase.from('profiles').insert({
+          id: data.user.id,
+          email: data.user.email!,
+          full_name: fullName,
+          status: 'PENDING',
+          role: 'SALES'
+        });
+
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+        }
+
+        setSuccess('Đăng ký thành công! Vui lòng chờ quản trị viên phê duyệt tài khoản.');
+        setIsRegister(false);
+      }
     } else {
-      navigate('/');
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
+      });
+
+      if (authError) {
+        setError('Thông tin đăng nhập không chính xác');
+      } else {
+        navigate('/');
+      }
     }
+    setLoading(false);
   };
 
   return (
@@ -43,7 +83,7 @@ const Login: React.FC = () => {
           <div className="w-16 h-16 bg-gold-primary flex items-center justify-center rounded-sm mb-4">
             <Briefcase className="text-ink" size={32} />
           </div>
-          <h1 className="text-3xl text-ink">Đăng nhập</h1>
+          <h1 className="text-3xl text-ink">{isRegister ? 'Đăng ký' : 'Đăng nhập'}</h1>
           <p className="text-[10px] uppercase font-black text-neutral-400 tracking-[0.2em] mt-2">Hệ Thống NGHIATIN GOLD</p>
         </div>
 
@@ -54,16 +94,38 @@ const Login: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        {success && (
+          <div className="bg-green-50 text-green-600 p-4 rounded-sm flex items-center gap-3 mb-6 border border-green-100 italic text-sm">
+            <Briefcase size={18} />
+            <span>{success}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleAuth} className="flex flex-col gap-4">
+          {isRegister && (
+            <div className="input-field">
+              <label htmlFor="fullName">Họ và tên</label>
+              <input 
+                id="fullName"
+                type="text" 
+                value={fullName} 
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                required={isRegister}
+                disabled={loading}
+              />
+            </div>
+          )}
+
           <div className="input-field">
-            <label htmlFor="email">Email đăng nhập / Username</label>
+            <label htmlFor="email">Email đăng nhập</label>
             <input 
               id="email"
               name="email"
               type="text" 
               value={email} 
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="binhphan.070582@gmail.com hoặc 'admin'"
+              placeholder="email@gmail.com"
               required
               disabled={loading}
               autoComplete="username"
@@ -92,15 +154,24 @@ const Login: React.FC = () => {
           >
             {loading ? 'Đang xử lý...' : (
               <>
-                Vào hệ thống <LogIn size={18} />
+                {isRegister ? 'Đăng ký ngay' : 'Vào hệ thống'} <LogIn size={18} />
               </>
             )}
           </button>
         </form>
 
+        <div className="mt-4 text-center">
+          <button 
+            onClick={() => setIsRegister(!isRegister)}
+            className="text-xs text-neutral-500 hover:text-ink font-bold uppercase tracking-tighter"
+          >
+            {isRegister ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký tại đây'}
+          </button>
+        </div>
+
         <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
           <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
-            &copy; 2026 @BINHPHAN. All Rights Reserved.
+            &copy; 2026 NGHIATIN GOLD. All Rights Reserved.
           </p>
         </div>
       </motion.div>

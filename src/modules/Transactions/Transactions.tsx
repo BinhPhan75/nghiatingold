@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Product, Transaction, SystemConfig } from '../../types';
+import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
@@ -14,6 +14,7 @@ const Transactions: React.FC = () => {
   const initialType = searchParams.get('type') === 'BUY' ? 'BUY' : 'SELL';
   const [type, setType] = useState<'BUY' | 'SELL'>(initialType);
   const [products, setProducts] = useState<Product[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [config, setConfig] = useState<SystemConfig | null>(null);
   
@@ -21,6 +22,8 @@ const Transactions: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerCCCD, setCustomerCCCD] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [customerBankId, setCustomerBankId] = useState('');
+  const [customerAccountNo, setCustomerAccountNo] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [cashAmount, setCashAmount] = useState<number>(0);
@@ -41,6 +44,7 @@ const Transactions: React.FC = () => {
   useEffect(() => {
     fetchProducts();
     fetchConfig();
+    fetchBanks();
   }, []);
 
   const fetchProducts = async () => {
@@ -51,6 +55,11 @@ const Transactions: React.FC = () => {
   const fetchConfig = async () => {
     const { data } = await supabase.from('system_config').select('*').limit(1);
     if (data && data.length > 0) setConfig(data[0]);
+  };
+
+  const fetchBanks = async () => {
+    const { data } = await supabase.from('banks').select('*').order('short_name');
+    if (data) setBanks(data);
   };
 
   useEffect(() => {
@@ -126,6 +135,8 @@ const Transactions: React.FC = () => {
       customer_name: customerName,
       customer_cccd: customerCCCD,
       dia_chi: customerAddress,
+      customer_bank_id: type === 'BUY' ? customerBankId : undefined,
+      customer_account_no: type === 'BUY' ? customerAccountNo : undefined,
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
       quantity,
@@ -153,7 +164,20 @@ const Transactions: React.FC = () => {
           alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ.");
         }
       } else {
-        setShowSuccess(true);
+        // For BUY transactions, generate QR for the SHOP to pay CUSTOMER
+        if (transferAmount > 0 && customerBankId && customerAccountNo) {
+          const bank = banks.find(b => b.id === customerBankId);
+          if (bank) {
+            const desc = removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name} ${customerName} ${customerCCCD}`);
+            const url = getVietQRUrl(bank.bin, customerAccountNo, customerName, transferAmount, desc);
+            setQrUrl(url);
+            setShowQR(true);
+          } else {
+            setShowSuccess(true);
+          }
+        } else {
+          setShowSuccess(true);
+        }
       }
     } catch (error: any) {
       setLastError(error);
@@ -275,6 +299,32 @@ const Transactions: React.FC = () => {
             />
           </div>
 
+          {type === 'BUY' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="input-field">
+                <label>Ngân hàng nhận (của khách)</label>
+                <select 
+                  value={customerBankId}
+                  onChange={(e) => setCustomerBankId(e.target.value)}
+                >
+                  <option value="">-- Chọn ngân hàng --</option>
+                  {banks.map(bank => (
+                    <option key={bank.id} value={bank.id}>{bank.short_name} - {bank.full_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="input-field">
+                <label>Số tài khoản khách hàng</label>
+                <input 
+                  type="text" 
+                  value={customerAccountNo}
+                  onChange={(e) => setCustomerAccountNo(e.target.value)}
+                  placeholder="Nhập số tài khoản"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="input-field">
             <label>Mặt hàng gold</label>
             <select 
@@ -365,7 +415,7 @@ const Transactions: React.FC = () => {
               exit={{ opacity: 0, scale: 0.9 }}
               className="bg-white p-8 rounded-sm shadow-xl flex flex-col items-center text-center"
             >
-              <h3 className="mb-4">Mã thanh toán VietQR</h3>
+              <h3 className="mb-4">{type === 'SELL' ? 'Mã thanh toán VietQR' : 'QR Thanh toán cho khách'}</h3>
               <div className="bg-white p-2 border border-neutral-100 shadow-inner mb-6 ring-4 ring-neutral-50">
                 <img 
                   src={qrUrl} 
@@ -379,11 +429,16 @@ const Transactions: React.FC = () => {
                 <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản (Không dấu)</p>
                 <div className="flex justify-between items-center gap-4">
                   <span className="font-mono font-bold text-sm text-ink break-all">
-                    {removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)}
+                    {type === 'SELL' 
+                      ? removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)
+                      : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct?.unit} ${selectedProduct?.name} ${customerName} ${customerCCCD}`)
+                    }
                   </span>
                   <button 
                     onClick={() => {
-                      const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`);
+                      const desc = type === 'SELL' 
+                        ? removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)
+                        : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct?.unit} ${selectedProduct?.name} ${customerName} ${customerCCCD}`);
                       navigator.clipboard.writeText(desc);
                       alert("Đã sao chép nội dung!");
                     }}
@@ -397,11 +452,11 @@ const Transactions: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4 w-full mb-8">
                 <div className="text-left">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Chủ tài khoản</p>
-                  <p className="text-xs font-bold">{config?.account_holder}</p>
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Người nhận</p>
+                  <p className="text-xs font-bold">{type === 'SELL' ? config?.account_holder : customerName}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền CK</p>
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền {type === 'SELL' ? 'CK' : 'Thanh toán'}</p>
                   <p className="text-xs font-bold">{formatCurrency(transferAmount || totalAmount)}</p>
                 </div>
               </div>
@@ -410,7 +465,7 @@ const Transactions: React.FC = () => {
                 onClick={resetForm} 
                 className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
               >
-                Xác nhận đã nhận tiền
+                {type === 'SELL' ? 'Xác nhận đã nhận tiền' : 'Xác nhận đã chuyển tiền'}
               </button>
             </motion.div>
           ) : showSuccess ? (

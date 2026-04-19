@@ -11,6 +11,7 @@ interface AuthContextType {
   isAccountant: boolean;
   isSales: boolean;
   isConfigured: boolean;
+  isApproved: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAccountant: role === 'ACCOUNTANT',
     isSales: role === 'SALES' || (!role && !isAdminEmail),
     isConfigured: isSupabaseConfigured,
+    isApproved: profile?.status === 'APPROVED' || isAdminEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,11 +1,20 @@
 export type UserRole = 'ADMIN' | 'ACCOUNTANT' | 'SALES';
+export type UserStatus = 'PENDING' | 'APPROVED' | 'BLOCKED';
 
 export interface Profile {
   id: string;
   email: string;
   full_name: string;
   role: UserRole;
+  status: UserStatus;
   created_at: string;
+}
+
+export interface Bank {
+  id: string;
+  short_name: string; // e.g., VCB
+  full_name: string; // e.g., Vietcombank
+  bin: string; // e.g., 970436
 }
 
 export interface Product {
@@ -31,6 +40,8 @@ export interface Transaction {
   total_amount: number;
   tien_mat: number;
   chuyen_khoan: number;
+  customer_bank_id?: string;
+  customer_account_no?: string;
   created_at: string;
   created_by: string;
   salesperson?: {
