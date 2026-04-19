@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck } from 'lucide-react';
+import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
@@ -85,8 +85,14 @@ const System: React.FC = () => {
 
   const fetchProfiles = async () => {
     const { data: snapshot } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    if (snapshot) setProfiles(snapshot);
+    if (snapshot) {
+      setProfiles(snapshot);
+      console.log("Fetched profiles count:", snapshot.length);
+    }
   };
+
+  const pendingProfiles = profiles.filter(p => p.status === 'PENDING');
+  const otherProfiles = profiles.filter(p => p.status !== 'PENDING');
 
   const fetchBanks = async () => {
     const { data: snapshot } = await supabase.from('banks').select('*').order('short_name');
@@ -493,16 +499,25 @@ const System: React.FC = () => {
             <div className="flex flex-col md:flex-row md:justify-between md:items-center border-b border-neutral-100 pb-4 mb-4 gap-4">
               <div className="flex items-center gap-3">
                 <Users className="text-gold-primary" />
-                <h3 className="text-xl">Quản lý nhân sự</h3>
+                <h3 className="text-xl">Quản lý nhân sự ({profiles.length})</h3>
               </div>
-              {isAdmin && (
+              <div className="flex gap-2">
                 <button 
-                  onClick={() => setShowAddStaff(true)}
-                  className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all w-full md:w-auto"
+                  onClick={fetchProfiles}
+                  className="bg-paper border border-neutral-200 text-neutral-500 px-4 py-3 text-[10px] font-black uppercase hover:bg-neutral-50"
+                  title="Tải lại danh sách"
                 >
-                  <UserPlus size={16} /> Thêm nhân viên
+                  Làm mới
                 </button>
-              )}
+                {isAdmin && (
+                  <button 
+                    onClick={() => setShowAddStaff(true)}
+                    className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all w-full md:w-auto"
+                  >
+                    <UserPlus size={16} /> Thêm nhân viên
+                  </button>
+                )}
+              </div>
             </div>
 
             {showAddStaff && (
@@ -514,86 +529,53 @@ const System: React.FC = () => {
                 <div className="text-sm text-neutral-600 mb-4 bg-white p-4 border border-neutral-100 italic">
                   <p className="mb-2">1. Yêu cầu nhân viên truy cập trang web và đăng ký tài khoản bằng email của họ.</p>
                   <p>2. Sau khi họ đăng ký thành công, tên của họ sẽ xuất hiện trong danh sách bên dưới.</p>
-                  <p>3. Bạn quay lại đây và nhấn <strong>"Thay đổi quyền"</strong> để cấp quyền cho nhân viên đó.</p>
+                  <p>3. Bạn quay lại đây và nhấn <strong>"Duyệt tài khoản"</strong> để kích hoạt.</p>
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {profiles.map(p => (
-                <div key={p.id} className="p-6 border border-neutral-100 rounded-sm relative overflow-hidden group">
-                  <div className={`absolute top-0 right-0 w-20 h-20 -mr-10 -mt-10 rotate-45 opacity-10 transition-transform group-hover:scale-110 ${p.role === 'ADMIN' ? 'bg-red-500' : 'bg-gold-primary'}`}></div>
-                  <div className="flex flex-col gap-1 mb-4">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
-                        {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
-                      </span>
-                      <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
-                        p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
-                        p.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
-                  </div>
-                  <div className="text-xs font-medium text-neutral-500 mb-6">
-                    <p className="truncate" title={p.email}>{p.email}</p>
-                    <p className="mt-1">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
-                  </div>
-                  {isAdmin && p.email !== profile?.email && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex gap-2">
-                        {p.status === 'PENDING' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
-                            className="bg-green-600 text-white px-3 py-1.5 rounded-sm text-[9px] font-black uppercase hover:bg-green-700 flex items-center gap-1"
-                          >
-                            <UserCheck size={12} /> Duyệt tài khoản
-                          </button>
-                        )}
-                        {p.status === 'APPROVED' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(p.id, 'BLOCKED')}
-                            className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-red-100"
-                          >
-                            Khóa
-                          </button>
-                        )}
-                        {p.status === 'BLOCKED' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
-                            className="text-green-500 hover:bg-green-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-green-100"
-                          >
-                            Mở khóa
-                          </button>
-                        )}
-                      </div>
-
-                      <button 
-                        onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
-                        className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left"
-                      >
-                        {showRoleUpdate === p.id ? 'Hủy bỏ' : 'Thay đổi quyền'}
-                      </button>
-                      
-                      {showRoleUpdate === p.id && (
-                        <div className="flex gap-2 mt-1">
-                          {(['ADMIN', 'ACCOUNTANT', 'SALES'] as UserRole[]).map(roleOption => (
-                            <button
-                              key={roleOption}
-                              onClick={() => handleUpdateRole(p.id, roleOption)}
-                              className={`text-[9px] px-2 py-1 border ${p.role === roleOption ? 'bg-ink text-paper border-ink' : 'border-neutral-200 text-neutral-500'} hover:border-ink transition-all font-black uppercase`}
-                            >
-                              {roleOption}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+            {/* Pending Section */}
+            {pendingProfiles.length > 0 && (
+              <div className="mb-8">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600 mb-4 flex items-center gap-2">
+                  <Clock className="animate-pulse" size={14} /> Chờ phê duyệt ({pendingProfiles.length})
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pendingProfiles.map(p => (
+                    <UserCard 
+                      key={p.id} 
+                      p={p} 
+                      isAdmin={isAdmin} 
+                      currentProfile={profile} 
+                      showRoleUpdate={showRoleUpdate}
+                      setShowRoleUpdate={setShowRoleUpdate}
+                      handleUpdateStatus={handleUpdateStatus}
+                      handleUpdateRole={handleUpdateRole}
+                    />
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Approved/Blocked Section */}
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-4">
+                Danh sách nhân viên khác ({otherProfiles.length})
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {otherProfiles.map(p => (
+                  <UserCard 
+                    key={p.id} 
+                    p={p} 
+                    isAdmin={isAdmin} 
+                    currentProfile={profile} 
+                    showRoleUpdate={showRoleUpdate}
+                    setShowRoleUpdate={setShowRoleUpdate}
+                    handleUpdateStatus={handleUpdateStatus}
+                    handleUpdateRole={handleUpdateRole}
+                  />
+                ))}
+              </div>
             </div>
             
             {!isAdmin && (
@@ -844,3 +826,86 @@ const System: React.FC = () => {
 };
 
 export default System;
+
+const UserCard: React.FC<{ 
+  p: Profile, 
+  isAdmin: boolean, 
+  currentProfile: Profile | null, 
+  showRoleUpdate: string | null,
+  setShowRoleUpdate: (val: string | null) => void,
+  handleUpdateStatus: (id: string, status: UserStatus) => void,
+  handleUpdateRole: (id: string, role: UserRole) => void
+}> = ({ p, isAdmin, currentProfile, showRoleUpdate, setShowRoleUpdate, handleUpdateStatus, handleUpdateRole }) => (
+  <div className="p-6 border border-neutral-100 rounded-sm relative overflow-hidden group bg-white shadow-sm hover:shadow-md transition-shadow">
+    <div className={`absolute top-0 right-0 w-20 h-20 -mr-10 -mt-10 rotate-45 opacity-10 transition-transform group-hover:scale-110 ${p.role === 'ADMIN' ? 'bg-red-500' : 'bg-gold-primary'}`}></div>
+    <div className="flex flex-col gap-1 mb-4">
+      <div className="flex justify-between items-start">
+        <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
+          {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
+        </span>
+        <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+          p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+          p.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {p.status}
+        </span>
+      </div>
+      <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
+    </div>
+    <div className="text-xs font-medium text-neutral-500 mb-6">
+      <p className="truncate" title={p.email}>{p.email}</p>
+      <p className="mt-1">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
+    </div>
+    {isAdmin && p.email !== currentProfile?.email && (
+      <div className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          {p.status === 'PENDING' && (
+            <button 
+              onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
+              className="bg-green-600 text-white px-3 py-1.5 rounded-sm text-[9px] font-black uppercase hover:bg-green-700 flex items-center gap-1 shadow-sm"
+            >
+              <UserCheck size={12} /> Duyệt tài khoản
+            </button>
+          )}
+          {p.status === 'APPROVED' && (
+            <button 
+              onClick={() => handleUpdateStatus(p.id, 'BLOCKED')}
+              className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-red-100"
+            >
+              Khóa
+            </button>
+          )}
+          {p.status === 'BLOCKED' && (
+            <button 
+              onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
+              className="text-green-500 hover:bg-green-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-green-100"
+            >
+              Mở khóa
+            </button>
+          )}
+        </div>
+
+        <button 
+          onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
+          className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left flex items-center gap-1"
+        >
+          {showRoleUpdate === p.id ? 'Hủy bỏ' : 'Thay đổi quyền'}
+        </button>
+        
+        {showRoleUpdate === p.id && (
+          <div className="flex gap-2 mt-1">
+            {(['ADMIN', 'ACCOUNTANT', 'SALES'] as UserRole[]).map(roleOption => (
+              <button
+                key={roleOption}
+                onClick={() => handleUpdateRole(p.id, roleOption)}
+                className={`text-[9px] px-2 py-1 border ${p.role === roleOption ? 'bg-ink text-paper border-ink shadow-sm' : 'border-neutral-200 text-neutral-500'} hover:border-ink transition-all font-black uppercase`}
+              >
+                {roleOption}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);

@@ -52,6 +52,10 @@ const Login: React.FC = () => {
 
         if (profileError) {
           console.error("Profile creation error:", profileError);
+          setError("Lỗi tạo hồ sơ người dùng: " + profileError.message);
+          setLoading(false);
+          // Try to clean up auth user if profile fails (optional/risky depending on requirements)
+          return;
         }
 
         setSuccess('Đăng ký thành công! Vui lòng chờ quản trị viên phê duyệt tài khoản.');
