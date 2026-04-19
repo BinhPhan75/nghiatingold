@@ -11,26 +11,25 @@ import System from './modules/System/System';
 import { AlertTriangle, Key } from 'lucide-react';
 
 const ConfigWarning: React.FC = () => (
-  <div className="min-h-screen bg-ink flex items-center justify-center p-4 text-paper">
-    <div className="bg-paper p-8 rounded-sm shadow-2xl max-w-md w-full text-center text-ink border-4 border-gold-primary">
-      <div className="w-16 h-16 bg-gold-primary/10 text-gold-primary rounded-full flex items-center justify-center mx-auto mb-6">
+  <div className="min-h-screen bg-ink flex items-center justify-center p-4 text-ink">
+    <div className="bg-paper p-8 rounded-sm shadow-2xl max-w-md w-full text-center">
+      <div className="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-6">
         <AlertTriangle size={32} />
       </div>
-      <h2 className="text-2xl mb-4 font-black uppercase tracking-tighter">Thiếu Cấu Hình Supabase</h2>
+      <h2 className="text-2xl mb-4 font-black uppercase">Thiếu Cấu Hình Supabase</h2>
       <p className="text-neutral-500 text-sm mb-8 font-medium">
-        Vui lòng thiết lập các biến môi trường <strong className="text-ink">VITE_SUPABASE_URL</strong> và <strong className="text-ink">VITE_SUPABASE_ANON_KEY</strong> trong menu <strong>Settings</strong> để ứng dụng có thể hoạt động.
-        <br/><span className="text-[10px] text-red-400 font-bold mt-2 inline-block italic underline underline-offset-2">* Lưu ý: Không để dấu gạch chéo (/) ở cuối URL.</span>
+        Vui lòng thiết lập các biến môi trường <strong>VITE_SUPABASE_URL</strong> và <strong>VITE_SUPABASE_ANON_KEY</strong> trong menu Settings để ứng dụng có thể hoạt động.
       </p>
       <div className="bg-neutral-50 p-4 border border-neutral-100 rounded-sm text-left mb-6">
         <p className="text-[10px] font-black uppercase text-neutral-400 mb-2 flex items-center gap-2">
           <Key size={12} /> Biến cần thiết:
         </p>
         <ul className="text-xs font-mono text-ink space-y-1">
-          <li className="flex justify-between"><span>VITE_SUPABASE_URL</span> <span className="text-[10px] text-red-500 font-bold">Chưa có</span></li>
-          <li className="flex justify-between"><span>VITE_SUPABASE_ANON_KEY</span> <span className="text-[10px] text-red-500 font-bold">Chưa có</span></li>
+          <li>• VITE_SUPABASE_URL</li>
+          <li>• VITE_SUPABASE_ANON_KEY</li>
         </ul>
       </div>
-      <p className="text-[10px] uppercase font-black text-neutral-400 tracking-tighter animate-pulse">
+      <p className="text-[10px] uppercase font-black text-neutral-400 tracking-tighter">
         Sau khi thiết lập, ứng dụng sẽ tự động tải lại.
       </p>
     </div>
@@ -46,9 +45,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, roles?: UserRole[] }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-ink flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-ink flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-gold-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-[10px] uppercase font-black tracking-widest text-gold-primary animate-pulse">Đang kiểm tra hệ thống...</p>
       </div>
     );
   }
@@ -58,11 +56,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode, roles?: UserRole[] }
   }
 
   if (roles && profile && !roles.includes(profile.role)) {
-    // If user is logged in but doesn't have role, and Accountant is restricted from Dashboard
-    if (profile.role === 'ACCOUNTANT' && window.location.pathname === '/') {
-      return <Navigate to="/reports" replace />;
-    }
-    return <Navigate to="/" replace />;
+    return <Navigate to={profile.role === 'ACCOUNTANT' ? "/reports" : "/"} replace />;
   }
 
   return <>{children}</>;

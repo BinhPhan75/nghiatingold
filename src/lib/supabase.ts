@@ -1,20 +1,28 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+let instance: SupabaseClient | null = null;
 
-export const isSupabaseConfigured = !!(rawUrl && rawKey);
+const getSupabase = (): SupabaseClient => {
+  if (instance) return instance;
 
-// Sanitize URL: remove trailing slash if present
-const supabaseUrl = rawUrl.trim().replace(/\/$/, '') || 'https://placeholder.supabase.co';
-const supabaseKey = rawKey.trim() || 'placeholder-key';
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Create a client. If configured is false, it uses dummy values to avoid crashes on startup
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
-
-export const getSupabase = () => {
-  if (!isSupabaseConfigured) {
-    throw new Error('Cấu hình Supabase bị thiếu. Vui lòng thiết lập VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY trong Settings.');
+  if (!url || !key) {
+    throw new Error('Supabase configuration missing. Please provide VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment variables.');
   }
-  return supabase;
+
+  instance = createClient(url, key);
+  return instance;
 };
+
+// Lazy-initialized proxy to prevent crash on module load
+export const supabase = new Proxy({} as SupabaseClient, {
+  get: (target, prop) => {
+    const client = getSupabase();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
+
+export const isSupabaseConfigured = !!(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);

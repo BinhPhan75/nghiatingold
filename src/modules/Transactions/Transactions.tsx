@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, AlertTriangle } from 'lucide-react';
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -44,19 +44,12 @@ const Transactions: React.FC = () => {
   }, []);
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase.from('products').select('*');
-    if (error) {
-      console.error("Products fetch error:", error);
-      setLastError(error);
-    }
+    const { data } = await supabase.from('products').select('*');
     if (data) setProducts(data);
   };
 
   const fetchConfig = async () => {
-    const { data, error } = await supabase.from('system_config').select('*').single();
-    if (error && error.code !== 'PGRST116') {
-      console.error("Config fetch error:", error);
-    }
+    const { data } = await supabase.from('system_config').select('*').single();
     if (data) setConfig(data);
   };
 
@@ -186,18 +179,30 @@ const Transactions: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       {lastError && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle size={18} className="text-red-500" />
-            <p className="text-xs text-red-700 font-medium">
-              {lastError.code === '42P01' 
-                ? 'Lỗi: Bảng Products chưa tồn tại. Vui lòng chạy SQL setup.' 
-                : 'Lỗi đồng bộ dữ liệu: ' + (lastError.message || 'Không rõ nguyên nhân')}
+        <div className="bg-red-900/90 text-white p-6 rounded-sm text-xs font-mono mb-6 flex justify-between items-start backdrop-blur-sm border-l-4 border-red-500 shadow-xl">
+          <div className="overflow-x-auto w-full">
+            <p className="font-bold mb-3 text-sm flex items-center gap-2">
+              <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (TRANSACTION ERROR):
             </p>
+            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
+            </div>
+            <div className="bg-white/10 p-4 rounded text-red-100">
+              <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
+              <ul className="list-disc ml-4 space-y-1">
+                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
+                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
+              </ul>
+              <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
+            </div>
           </div>
-          <button onClick={() => setLastError(null)} className="text-[10px] font-black uppercase text-red-500 hover:underline">Đóng</button>
+          <button onClick={() => setLastError(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4 focus:outline-none">
+            <X size={20} />
+          </button>
         </div>
       )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Transaction Control */}
       <motion.div 

@@ -7,13 +7,14 @@ import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup' | 'diagnostics'>('prices');
 
   const tabs = [
     { id: 'prices', label: 'Giá Vàng', roles: ['ADMIN', 'SALES'] },
     { id: 'users', label: 'Nhân Viên', roles: ['ADMIN'] },
     { id: 'bank', label: 'Ngân Hàng', roles: ['ADMIN'] },
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
+    { id: 'diagnostics', label: 'Kiểm Tra Kết Nối', roles: ['ADMIN'] },
   ];
 
   const filteredTabs = tabs.filter(t => {
@@ -29,17 +30,38 @@ const System: React.FC = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
-  const [newStaff, setNewStaff] = useState({ username: '', full_name: '', role: 'SALES' as UserRole, password: '' });
+  const [newStaff, setNewStaff] = useState({ email: '', full_name: '', role: 'SALES' as UserRole });
   const [restoring, setRestoring] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState<string | null>(null);
   const [lastError, setLastError] = useState<any>(null);
+  const [dbStatus, setDbStatus] = useState<{ loading: boolean; connected: boolean; message: string }>({ 
+    loading: false, connected: false, message: 'Chưa thực hiện kiểm tra' 
+  });
 
   useEffect(() => {
     setLastError(null);
     fetchProducts();
     fetchConfig();
     if (isAdmin || activeTab === 'users') fetchProfiles();
+    if (activeTab === 'diagnostics') checkConnection();
   }, [activeTab, isAdmin]);
+
+  const checkConnection = async () => {
+    setDbStatus({ loading: true, connected: false, message: 'Đang kết nối tới database...' });
+    try {
+      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      setDbStatus({ loading: false, connected: true, message: 'Kết nối thành công! Database hoạt động bình thường.' });
+    } catch (err: any) {
+      console.error("Connection Check Error:", err);
+      setDbStatus({ 
+        loading: false, 
+        connected: false, 
+        message: `Lỗi kết nối: ${err.message || 'Không thể truy cập Supabase. Hãy kiểm tra lại URL/Key trong cấu hình dự án.'}` 
+      });
+      setLastError(err);
+    }
+  };
 
   const fetchProducts = async () => {
     const { data } = await supabase.from('products').select('*').order('name');
@@ -113,45 +135,13 @@ const System: React.FC = () => {
 
   const handleAddStaffProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaff.username || !newStaff.password) {
-      alert("Vui lòng nhập đầy đủ Username và mật khẩu");
-      return;
-    }
+    if (!newStaff.email) return;
 
-    const { error } = await supabase
-      .from('profiles')
-      .insert([{
-        username: newStaff.username,
-        full_name: newStaff.full_name || newStaff.username,
-        pw: newStaff.password,
-        role: newStaff.role,
-        email: `${newStaff.username}@store.local` // Synthetic email
-      }]);
-
-    if (!error) {
-      alert("Đã thêm nhân viên thành công!");
-      fetchProfiles();
-      setNewStaff({ username: '', full_name: '', role: 'SALES', password: '' });
-      setShowAddStaff(false);
-    } else {
-      alert("Lỗi khi thêm nhân viên: " + error.message);
-    }
-  };
-
-  const handleDeleteStaff = async (id: string, email: string) => {
-    if (email === 'binhphan.070582@gmail.com') {
-      alert("Không thể xóa tài khoản Admin tối cao");
-      return;
-    }
-    if (!window.confirm("Bạn có chắc muốn xóa nhân viên này?")) return;
-
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', id);
-
-    if (!error) fetchProfiles();
-    else alert("Lỗi khi xóa: " + error.message);
+    // In a real app, you'd use supabase.auth.admin.createUser 
+    // but here we'll pre-insert a profile if the user signs up later
+    // or let the trigger handle it. For now, we provide clear instructions.
+    alert("Để thêm nhân viên: Hãy yêu cầu nhân viên đăng ký tài khoản bằng email: " + newStaff.email + ". Sau khi họ đăng ký, bạn có thể thay đổi quyền của họ tại đây.");
+    setShowAddStaff(false);
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -282,6 +272,31 @@ const System: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {lastError && (
+        <div className="bg-red-900/90 text-white p-6 rounded-sm text-xs font-mono mb-6 flex justify-between items-start backdrop-blur-sm border-l-4 border-red-500 shadow-xl">
+          <div className="overflow-x-auto w-full">
+            <p className="font-bold mb-3 text-sm flex items-center gap-2">
+              <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (SUPABASE ERROR):
+            </p>
+            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
+            </div>
+            <div className="bg-white/10 p-4 rounded text-red-100">
+              <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
+              <ul className="list-disc ml-4 space-y-1">
+                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
+                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
+              </ul>
+              <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
+            </div>
+          </div>
+          <button onClick={() => setLastError(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-4 focus:outline-none">
+            <X size={20} />
+          </button>
+        </div>
+      )}
 
       <div className="bg-paper p-8 rounded-sm shadow-sm border border-neutral-100 min-h-[500px]">
         {activeTab === 'prices' && (
@@ -451,56 +466,14 @@ const System: React.FC = () => {
             {showAddStaff && (
               <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Thêm nhân viên mới</h4>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Quy trình thêm nhân viên</h4>
                   <button onClick={() => setShowAddStaff(false)}><X size={18} /></button>
                 </div>
-                <form onSubmit={handleAddStaffProfile} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="input-field">
-                    <label>Tên đăng nhập (Username)</label>
-                    <input 
-                      type="text" 
-                      placeholder="VD: nhanvien1" 
-                      value={newStaff.username}
-                      onChange={e => setNewStaff({...newStaff, username: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="input-field">
-                    <label>Mật khẩu</label>
-                    <input 
-                      type="text" 
-                      placeholder="Nhập pass" 
-                      value={newStaff.password}
-                      onChange={e => setNewStaff({...newStaff, password: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="input-field">
-                    <label>Họ tên đầy đủ</label>
-                    <input 
-                      type="text" 
-                      placeholder="VD: Nguyễn Văn A" 
-                      value={newStaff.full_name}
-                      onChange={e => setNewStaff({...newStaff, full_name: e.target.value})}
-                    />
-                  </div>
-                  <div className="input-field">
-                    <label>Phân quyền</label>
-                    <select 
-                      value={newStaff.role}
-                      onChange={e => setNewStaff({...newStaff, role: e.target.value as UserRole})}
-                    >
-                      <option value="SALES">Bán hàng</option>
-                      <option value="ACCOUNTANT">Kế toán</option>
-                      <option value="ADMIN">Quản trị viên</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2 flex justify-end">
-                    <button type="submit" className="bg-ink text-paper py-3 px-10 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all">
-                      Xác nhận tạo
-                    </button>
-                  </div>
-                </form>
+                <div className="text-sm text-neutral-600 mb-4 bg-white p-4 border border-neutral-100 italic">
+                  <p className="mb-2">1. Yêu cầu nhân viên truy cập trang web và đăng ký tài khoản bằng email của họ.</p>
+                  <p>2. Sau khi họ đăng ký thành công, tên của họ sẽ xuất hiện trong danh sách bên dưới.</p>
+                  <p>3. Bạn quay lại đây và nhấn <strong>"Thay đổi quyền"</strong> để cấp quyền cho nhân viên đó.</p>
+                </div>
               </div>
             )}
 
@@ -512,30 +485,21 @@ const System: React.FC = () => {
                     <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
                       {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
                     </span>
-                    <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.username || p.email.split('@')[0]}</h4>
+                    <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
                   </div>
-                  <div className="text-xs font-medium text-neutral-500 mb-6 space-y-1">
-                    {p.username && <p>User: <span className="font-bold text-ink">{p.username}</span></p>}
-                    {p.pw && <p>Pass: <span className="font-mono bg-neutral-100 px-1">{p.pw}</span></p>}
-                    <p className="text-[10px] text-neutral-400">ID: {p.id.substring(0, 8)}...</p>
-                    <p className="text-[10px] text-neutral-400">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
+                  <div className="text-xs font-medium text-neutral-500 mb-6">
+                    <p>{p.email}</p>
+                    <p className="mt-1">Tham gia: {new Date(p.created_at).toLocaleDateString('vi-VN')}</p>
                   </div>
-                  {isAdmin && p.email !== 'binhphan.070582@gmail.com' && (
-                    <div className="flex flex-col gap-2 relative z-10">
-                      <div className="flex items-center justify-between">
-                        <button 
-                          onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
-                          className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left"
-                        >
-                          {showRoleUpdate === p.id ? 'Hủy bỏ' : 'Thay đổi quyền'}
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteStaff(p.id, p.email)}
-                          className="text-[10px] font-black uppercase text-red-400 hover:text-red-600 transition-colors"
-                        >
-                          Xóa tài khoản
-                        </button>
-                      </div>
+                  {isAdmin && p.email !== profile?.email && (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
+                        className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left"
+                      >
+                        {showRoleUpdate === p.id ? 'Hủy bỏ' : 'Thay đổi quyền'}
+                      </button>
+                      
                       {showRoleUpdate === p.id && (
                         <div className="flex gap-2 mt-2">
                           {(['ADMIN', 'ACCOUNTANT', 'SALES'] as UserRole[]).map(roleOption => (
@@ -655,6 +619,69 @@ const System: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        {activeTab === 'diagnostics' && (
+          <div className="flex flex-col gap-8 max-w-2xl">
+            <div className="flex items-center gap-3 border-b border-neutral-100 pb-4 mb-4">
+              <ShieldCheck className="text-gold-primary" />
+              <h3 className="text-xl inline-flex items-center gap-4">
+                Chẩn đoán kết nối Database
+                {dbStatus.loading ? (
+                  <span className="text-[10px] bg-neutral-100 px-2 py-1 italic animate-pulse">Checking...</span>
+                ) : (
+                  <span className={`text-[10px] px-2 py-1 font-black uppercase tracking-widest ${dbStatus.connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {dbStatus.connected ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                )}
+              </h3>
+            </div>
+
+            <div className={`p-6 border-l-4 ${dbStatus.connected ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'} rounded-sm shadow-sm`}>
+              <p className="font-bold mb-2">Trạng thái hiện tại:</p>
+              <p className="text-sm italic">{dbStatus.message}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình URL</p>
+                <code className="text-[11px] block break-all font-mono">
+                  {import.meta.env.VITE_SUPABASE_URL ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_URL'}
+                </code>
+              </div>
+              <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình API Key</p>
+                <code className="text-[11px] block break-all font-mono">
+                  {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_ANON_KEY'}
+                </code>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 p-6 border border-amber-200 rounded-sm">
+              <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2">
+                <ShieldCheck size={18} /> Lưu ý quan trọng về Quyền hạn (RLS)
+              </h4>
+              <p className="text-sm text-amber-700 mb-4">
+                Nếu bạn thấy trạng thái "ONLINE" nhưng vẫn không thể "Thêm mặt hàng", thì chắc chắn 100% là do **Row Level Security (RLS)** trên Supabase đang chặn yêu cầu của bạn.
+              </p>
+              <div className="bg-paper p-4 rounded border border-amber-100">
+                <p className="font-bold text-xs uppercase mb-2">Cách khắc phục:</p>
+                <ol className="text-xs list-decimal ml-4 space-y-2 text-neutral-600">
+                  <li>Truy cập <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-500 underline">Supabase Dashboard</a>.</li>
+                  <li>Mở mục <strong>SQL Editor</strong>.</li>
+                  <li>Copy nội dung từ file <strong>supabase-setup.sql</strong> trong mã nguồn ứng dụng này.</li>
+                  <li>Dán vào SQL Editor và nhấn <strong>Run</strong>.</li>
+                  <li>Nếu thấy thông báo "Success", hãy quay lại đây và thử lại.</li>
+                </ol>
+              </div>
+            </div>
+
+            <button 
+              onClick={checkConnection}
+              className="bg-ink text-paper py-4 px-6 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
+            >
+              Thử kết nối lại
+            </button>
           </div>
         )}
       </div>

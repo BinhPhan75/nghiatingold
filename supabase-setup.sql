@@ -2,29 +2,14 @@
 -- HƯỚNG DẪN: Nếu gặp lỗi "table already exists", hãy xóa các table cũ trước theo thứ tự: 
 -- drop table if exists transactions; drop table if exists profiles; drop table if exists products; drop table if exists system_config;
 
--- 1. Profiles table (linked to auth.users OR managed manually)
--- Đảm bảo các cột mới tồn tại cho các tài khoản cũ
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username text unique;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pw text;
-
+-- 1. Profiles table (linked to auth.users)
 create table if not exists profiles (
-  id uuid primary key default gen_random_uuid(),
-  email text,
-  username text unique,
-  pw text,
+  id uuid references auth.users on delete cascade primary key,
+  email text not null,
   full_name text,
   role text check (role in ('ADMIN', 'ACCOUNTANT', 'SALES')) default 'SALES',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
-
--- Seed an initial admin account if none exists
--- Note: Replace '220785' with a secure password in production
-INSERT INTO profiles (email, username, pw, full_name, role)
-SELECT 'binhphan.070582@gmail.com', 'admin', '220785', 'Administrator', 'ADMIN'
-WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE username = 'admin' OR email = 'binhphan.070582@gmail.com');
-
--- Note: In Supabase, if we want to link some to auth.users, we can.
--- But the user wants simple management.
 
 -- 2. Products table
 create table if not exists products (
@@ -105,18 +90,21 @@ drop policy if exists "Admin quản lý cấu hình" on system_config;
 -- Use auth.jwt() email directly for admin privilege to avoid "Infinite Recursion"
 
 -- 1. Profiles
-create policy "profiles_select_public" on profiles for select using (true);
-create policy "profiles_update_self" on profiles for update using (auth.uid() = id) with check (auth.uid() = id);
-create policy "profiles_all_anon" on profiles for all using (true) with check (true);
+create policy "profiles_select_auth" on profiles for select using (auth.role() = 'authenticated');
+create policy "profiles_update_self" on profiles for update using (auth.uid() = id);
+create policy "profiles_admin_all" on profiles for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
 -- 2. Products
-create policy "products_all_anon" on products for all using (true) with check (true);
+create policy "products_select_auth" on products for select using (auth.role() = 'authenticated');
+create policy "products_update_auth" on products for update using (auth.role() = 'authenticated');
+create policy "products_admin_all" on products for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
 -- 3. Transactions 
-create policy "transactions_all_anon" on transactions for all using (true) with check (true);
+create policy "transactions_all_auth" on transactions for all using (auth.role() = 'authenticated');
 
 -- 4. System Config
-create policy "config_all_anon" on system_config for all using (true) with check (true);
+create policy "config_select_auth" on system_config for select using (auth.role() = 'authenticated');
+create policy "config_admin_all" on system_config for all using (auth.jwt() ->> 'email' = 'binhphan.070582@gmail.com');
 
 -- Function & Trigger
 create or replace function public.handle_new_user()
@@ -130,8 +118,8 @@ begin
     default_role := 'SALES';
   end if;
 
-  insert into public.profiles (id, email, username, full_name, role)
-  values (new.id, new.email, split_part(new.email, '@', 1), new.raw_user_meta_data->>'full_name', default_role)
+  insert into public.profiles (id, email, full_name, role)
+  values (new.id, new.email, new.raw_user_meta_data->>'full_name', default_role)
   on conflict (id) do update set role = excluded.role;
   return new;
 end;
