@@ -63,7 +63,7 @@ const MainLayout: React.FC = () => {
         {/* Top Header */}
         <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-paper border-b border-neutral-100 shadow-sm shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg md:text-xl m-0 tracking-tight text-ink lowercase font-black">
+            <h2 className="text-lg md:text-xl m-0 tracking-tight text-ink font-black">
               NGHIATIN <span className="text-gold-dark italic">GOLD</span>
             </h2>
           </div>
