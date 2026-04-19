@@ -91,9 +91,6 @@ const System: React.FC = () => {
     }
   };
 
-  const pendingProfiles = profiles.filter(p => p.status === 'PENDING');
-  const otherProfiles = profiles.filter(p => p.status !== 'PENDING');
-
   const fetchBanks = async () => {
     const { data: snapshot } = await supabase.from('banks').select('*').order('short_name');
     if (snapshot) setBanks(snapshot);
@@ -509,79 +506,40 @@ const System: React.FC = () => {
                 >
                   Làm mới
                 </button>
-                {isAdmin && (
-                  <button 
-                    onClick={() => setShowAddStaff(true)}
-                    className="flex items-center justify-center gap-2 text-[10px] font-black uppercase bg-ink text-paper py-3 px-6 hover:bg-gold-primary hover:text-ink transition-all w-full md:w-auto"
-                  >
-                    <UserPlus size={16} /> Thêm nhân viên
-                  </button>
-                )}
               </div>
             </div>
 
-            {showAddStaff && (
-              <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Quy trình thêm nhân viên</h4>
-                  <button onClick={() => setShowAddStaff(false)}><X size={18} /></button>
-                </div>
-                <div className="text-sm text-neutral-600 mb-4 bg-white p-4 border border-neutral-100 italic">
-                  <p className="mb-2">1. Yêu cầu nhân viên truy cập trang web và đăng ký tài khoản bằng email của họ.</p>
-                  <p>2. Sau khi họ đăng ký thành công, tên của họ sẽ xuất hiện trong danh sách bên dưới.</p>
-                  <p>3. Bạn quay lại đây và nhấn <strong>"Duyệt tài khoản"</strong> để kích hoạt.</p>
+            <div className="bg-neutral-50 p-6 border border-neutral-200 mb-6 rounded-sm">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="text-ink" size={24} />
+                <div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-ink">Quản lý tài khoản</h4>
+                  <p className="text-xs text-neutral-600 italic">
+                    Lưu ý: Chức năng đăng ký tự động đã tắt. Vui lòng thêm nhân viên mới trực tiếp qua bảng điều khiển Supabase.
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Pending Section */}
-            {pendingProfiles.length > 0 && (
-              <div className="mb-8">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600 mb-4 flex items-center gap-2">
-                  <Clock className="animate-pulse" size={14} /> Chờ phê duyệt ({pendingProfiles.length})
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pendingProfiles.map(p => (
-                    <UserCard 
-                      key={p.id} 
-                      p={p} 
-                      isAdmin={isAdmin} 
-                      currentProfile={profile} 
-                      showRoleUpdate={showRoleUpdate}
-                      setShowRoleUpdate={setShowRoleUpdate}
-                      handleUpdateStatus={handleUpdateStatus}
-                      handleUpdateRole={handleUpdateRole}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Approved/Blocked Section */}
-            <div>
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-4">
-                Danh sách nhân viên khác ({otherProfiles.length})
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {otherProfiles.map(p => (
-                  <UserCard 
-                    key={p.id} 
-                    p={p} 
-                    isAdmin={isAdmin} 
-                    currentProfile={profile} 
-                    showRoleUpdate={showRoleUpdate}
-                    setShowRoleUpdate={setShowRoleUpdate}
-                    handleUpdateStatus={handleUpdateStatus}
-                    handleUpdateRole={handleUpdateRole}
-                  />
-                ))}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {profiles.map(p => (
+                <UserCard 
+                  key={p.id} 
+                  p={p} 
+                  isAdmin={isAdmin} 
+                  currentProfile={profile} 
+                  showRoleUpdate={showRoleUpdate}
+                  setShowRoleUpdate={setShowRoleUpdate}
+                  handleUpdateStatus={handleUpdateStatus}
+                  handleUpdateRole={handleUpdateRole}
+                />
+              ))}
             </div>
             
             {!isAdmin && (
               <div className="bg-neutral-50 p-4 border-l-4 border-blue-500 flex items-center gap-3 italic text-xs text-neutral-600">
                 <ShieldCheck size={18} className="text-blue-500" />
-                Chỉ quản trị viên mới có quyền tạo mới hoặc chỉnh sửa thông tin nhân viên.
+                Chỉ quản trị viên mới có quyền xem và chỉnh sửa phân quyền nhân viên.
               </div>
             )}
           </div>
@@ -859,28 +817,19 @@ const UserCard: React.FC<{
     {isAdmin && p.email !== currentProfile?.email && (
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
-          {p.status === 'PENDING' && (
-            <button 
-              onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
-              className="bg-green-600 text-white px-3 py-1.5 rounded-sm text-[9px] font-black uppercase hover:bg-green-700 flex items-center gap-1 shadow-sm"
-            >
-              <UserCheck size={12} /> Duyệt tài khoản
-            </button>
-          )}
-          {p.status === 'APPROVED' && (
+          {p.status === 'APPROVED' ? (
             <button 
               onClick={() => handleUpdateStatus(p.id, 'BLOCKED')}
               className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-red-100"
             >
-              Khóa
+              Khóa tài khoản
             </button>
-          )}
-          {p.status === 'BLOCKED' && (
+          ) : (
             <button 
               onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
               className="text-green-500 hover:bg-green-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-green-100"
             >
-              Mở khóa
+              Kích hoạt / Mở khóa
             </button>
           )}
         </div>
