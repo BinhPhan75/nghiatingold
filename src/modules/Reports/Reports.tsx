@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Transaction, Product, Profile } from '../../types';
-import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle, X, ExternalLink, Printer } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { motion, AnimatePresence } from 'motion/react';
 
 const Reports: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<(Transaction & { salesperson?: Profile })[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTransaction, setSelectedTransaction] = useState<(Transaction & { salesperson?: Profile }) | null>(null);
   const [lastError, setLastError] = useState<any>(null);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean; message: string }>({ 
     connected: true, message: '' 
@@ -30,9 +33,15 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchBanks();
     fetchTransactions();
     checkConnection();
   }, []);
+
+  const fetchBanks = async () => {
+    const { data } = await supabase.from('banks').select('*');
+    if (data) setBanks(data);
+  };
 
   const checkConnection = async () => {
     const { error } = await supabase.from('transactions').select('id', { count: 'exact', head: true });
@@ -287,7 +296,11 @@ const Reports: React.FC = () => {
                 </tr>
               ) : (
                 transactions.map(t => (
-                  <tr key={t.id} className="hover:bg-neutral-50 transition-colors">
+                  <tr 
+                    key={t.id} 
+                    className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedTransaction(t)}
+                  >
                     <td className="p-4 font-mono text-center">
                       <div className="font-bold text-ink text-[11px]">{new Date(t.created_at).toLocaleDateString('vi-VN')}</div>
                       <div className="text-neutral-400 text-[10px]">{new Date(t.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</div>
@@ -330,6 +343,161 @@ const Reports: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedTransaction && (
+          <div className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-paper w-full max-w-2xl rounded-sm overflow-hidden shadow-2xl relative"
+            >
+              {/* Modal Header */}
+              <div className="bg-ink text-paper p-6 flex justify-between items-center">
+                <div className="flex flex-col gap-1">
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm inline-block w-fit ${selectedTransaction.type === 'BUY' ? 'bg-red-500 text-white' : 'bg-gold-primary text-ink'}`}>
+                    {selectedTransaction.type === 'BUY' ? 'MUA VÀO' : 'BÁN RA'}
+                  </span>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter">Chi tiết giao dịch</h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedTransaction(null)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-8 max-h-[80vh] overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {/* Left Column: Customer & Transaction Meta */}
+                  <div className="flex flex-col gap-8">
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Thông tin khách hàng</h4>
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <p className="text-[10px] text-neutral-400 font-bold uppercase mb-1">Họ tên</p>
+                          <p className="text-lg font-bold text-ink uppercase tracking-tight">{selectedTransaction.customer_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-neutral-400 font-bold uppercase mb-1">CCCD</p>
+                          <p className="text-sm font-mono font-medium text-ink">{selectedTransaction.customer_cccd}</p>
+                        </div>
+                        {selectedTransaction.dia_chi && (
+                          <div>
+                            <p className="text-[10px] text-neutral-400 font-bold uppercase mb-1">Địa chỉ</p>
+                            <p className="text-xs text-neutral-600 italic leading-relaxed">{selectedTransaction.dia_chi}</p>
+                          </div>
+                        )}
+                        {selectedTransaction.type === 'BUY' && selectedTransaction.customer_bank_id && (
+                          <div className="bg-neutral-50 p-3 rounded border border-neutral-100">
+                             <p className="text-[10px] text-neutral-400 font-bold uppercase mb-1">Thanh toán cho khách qua</p>
+                             <p className="text-xs font-bold text-ink">
+                               {banks.find(b => b.id === selectedTransaction.customer_bank_id)?.short_name || 'N/A'} - {selectedTransaction.customer_account_no}
+                             </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Người thực hiện</h4>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-neutral-100 rounded-full flex items-center justify-center font-black text-neutral-400">
+                          {selectedTransaction.salesperson?.full_name?.charAt(0) || 'S'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-ink">{selectedTransaction.salesperson?.full_name || 'Hệ thống'}</p>
+                          <p className="text-[10px] text-neutral-400">{selectedTransaction.salesperson?.email || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Order Details & Payment */}
+                  <div className="flex flex-col gap-8">
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Thông tin mặt hàng</h4>
+                      <div className="bg-neutral-50 p-4 rounded-sm border border-neutral-100">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <p className="text-lg font-black text-ink italic">{selectedTransaction.product_name}</p>
+                            <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">
+                              {selectedTransaction.quantity} {selectedTransaction.unit}
+                            </p>
+                          </div>
+                          <p className="text-sm font-mono font-bold text-neutral-400">
+                            ID: {selectedTransaction.id.slice(0, 8)}
+                          </p>
+                        </div>
+                        <div className="space-y-2 pt-4 border-t border-neutral-200/50">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-neutral-500">Đơn giá:</span>
+                            <span className="font-bold">{formatCurrency(selectedTransaction.price_per_unit)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-neutral-500">Thành tiền:</span>
+                            <span className="font-bold">{formatCurrency(selectedTransaction.price_per_unit * selectedTransaction.quantity)}</span>
+                          </div>
+                          {selectedTransaction.chiet_khau > 0 && (
+                            <div className="flex justify-between text-xs text-red-500 italic">
+                              <span>Chiết khấu (-):</span>
+                              <span className="font-bold">-{formatCurrency(selectedTransaction.chiet_khau)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Thanh toán</h4>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex justify-between items-end border-b border-neutral-50 pb-2 mb-2">
+                          <span className="text-[10px] font-black uppercase text-neutral-400">Tổng cộng</span>
+                          <span className="text-2xl font-black text-ink">{formatCurrency(selectedTransaction.total_amount)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-orange-50 p-3 border border-orange-100 rounded-sm">
+                            <p className="text-[9px] font-black uppercase text-orange-400 mb-1">Tiền mặt</p>
+                            <p className="text-sm font-bold text-orange-700">{formatCurrency(selectedTransaction.tien_mat || 0)}</p>
+                          </div>
+                          <div className="bg-green-50 p-3 border border-green-100 rounded-sm">
+                            <p className="text-[9px] font-black uppercase text-green-500 mb-1">Chuyển khoản</p>
+                            <p className="text-sm font-bold text-green-700">{formatCurrency(selectedTransaction.chuyen_khoan || 0)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-[9px] text-neutral-400 italic">
+                      <p>Ngày thực hiện: {new Date(selectedTransaction.created_at).toLocaleString('vi-VN')}</p>
+                      <p>Mã chuẩn: {selectedTransaction.id}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-neutral-50 p-6 border-t border-neutral-100 flex justify-end gap-4">
+                <button 
+                  onClick={() => window.print()}
+                  className="px-6 py-2 border border-neutral-200 text-neutral-500 text-[10px] font-black uppercase hover:bg-white hover:text-ink transition-all flex items-center gap-2"
+                >
+                  <Printer size={14} /> In phiếu
+                </button>
+                <button 
+                  onClick={() => setSelectedTransaction(null)}
+                  className="px-8 py-2 bg-ink text-paper text-[10px] font-black uppercase tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-md"
+                >
+                  Đóng lại
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
