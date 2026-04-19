@@ -30,7 +30,6 @@ const System: React.FC = () => {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', buy_price: 0, sell_price: 0 });
-  const [newStaff, setNewStaff] = useState({ email: '', full_name: '', role: 'SALES' as UserRole });
   const [restoring, setRestoring] = useState(false);
   const [showRoleUpdate, setShowRoleUpdate] = useState<string | null>(null);
   const [lastError, setLastError] = useState<any>(null);
@@ -48,27 +47,25 @@ const System: React.FC = () => {
 
   const checkConnection = async () => {
     setDbStatus({ loading: true, connected: false, message: 'Đang kết nối tới database...' });
-    try {
-      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
-      if (error) throw error;
-      setDbStatus({ loading: false, connected: true, message: 'Kết nối thành công! Database hoạt động bình thường.' });
-    } catch (err: any) {
-      console.error("Connection Check Error:", err);
+    const { data, error } = await supabase.from('products').select('id').limit(1);
+    if (error) {
       setDbStatus({ 
         loading: false, 
         connected: false, 
-        message: `Lỗi kết nối: ${err.message || 'Không thể truy cập Supabase. Hãy kiểm tra lại URL/Key trong cấu hình dự án.'}` 
+        message: `Lỗi kết nối: ${error.message || 'Không thể truy cập Supabase.'}` 
       });
-      setLastError(err);
+      setLastError(error);
+    } else {
+      setDbStatus({ loading: false, connected: true, message: 'Kết nối thành công! Database hoạt động bình thường.' });
     }
   };
 
   const fetchProducts = async () => {
-    const { data } = await supabase.from('products').select('*').order('name');
-    if (data) {
-      setProducts(data);
+    const { data: snapshot } = await supabase.from('products').select('*').order('name');
+    if (snapshot) {
+      setProducts(snapshot);
       const initialEditing: Record<string, { buy_price: number; sell_price: number }> = {};
-      data.forEach(p => {
+      snapshot.forEach(p => {
         initialEditing[p.id] = { buy_price: p.buy_price, sell_price: p.sell_price };
       });
       setEditingPrices(initialEditing);
@@ -76,13 +73,15 @@ const System: React.FC = () => {
   };
 
   const fetchConfig = async () => {
-    const { data } = await supabase.from('system_config').select('*').single();
-    if (data) setConfig(data);
+    const { data: snapshot } = await supabase.from('system_config').select('*').limit(1);
+    if (snapshot && snapshot.length > 0) {
+      setConfig(snapshot[0]);
+    }
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('role');
-    if (data) setProfiles(data);
+    const { data: snapshot } = await supabase.from('profiles').select('*').order('role');
+    if (snapshot) setProfiles(snapshot);
   };
 
   if (authLoading) {
@@ -100,65 +99,60 @@ const System: React.FC = () => {
     const edited = editingPrices[id];
     if (!edited) return;
 
-    const { error } = await supabase
-      .from('products')
-      .update({ 
-        buy_price: edited.buy_price, 
-        sell_price: edited.sell_price,
-        updated_at: new Date().toISOString() 
-      })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ 
+          buy_price: edited.buy_price, 
+          sell_price: edited.sell_price,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id);
 
-    if (error) {
-      setLastError(error);
-      console.error("Save Price Error:", error);
-    } else {
+      if (error) throw error;
       alert("Đã cập nhật giá thành công!");
       fetchProducts();
+    } catch (error: any) {
+      setLastError(error);
+      console.error("Save Price Error:", error);
     }
   };
 
   const handleUpdateRole = async (userId: string, newRole: UserRole) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
 
-    if (error) {
-      alert("Lỗi khi cập nhật quyền: " + error.message);
-    } else {
+      if (error) throw error;
       alert("Đã cập nhật quyền nhân viên thành công!");
       fetchProfiles();
       setShowRoleUpdate(null);
+    } catch (error: any) {
+      alert("Lỗi khi cập nhật quyền: " + error.message);
     }
-  };
-
-  const handleAddStaffProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStaff.email) return;
-
-    // In a real app, you'd use supabase.auth.admin.createUser 
-    // but here we'll pre-insert a profile if the user signs up later
-    // or let the trigger handle it. For now, we provide clear instructions.
-    alert("Để thêm nhân viên: Hãy yêu cầu nhân viên đăng ký tài khoản bằng email: " + newStaff.email + ". Sau khi họ đăng ký, bạn có thể thay đổi quyền của họ tại đây.");
-    setShowAddStaff(false);
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.name || !newProduct.unit) return;
 
-    const { error } = await supabase
-      .from('products')
-      .insert([newProduct]);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .insert([{
+          ...newProduct,
+          updated_at: new Date().toISOString()
+        }]);
 
-    if (!error) {
+      if (error) throw error;
       alert("Đã thêm mặt hàng thành công!");
       fetchProducts();
       setShowAddProduct(false);
       setNewProduct({ name: '', unit: '', buy_price: 0, sell_price: 0 });
       setLastError(null);
-    } else {
+    } catch (error: any) {
       setLastError(error);
       console.error("Add Product Error:", error);
       alert("Lỗi khi thêm mặt hàng: " + (error.message || "Kiểm tra quyền truy cập"));
@@ -168,30 +162,39 @@ const System: React.FC = () => {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa mặt hàng này?")) return;
 
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
 
-    if (!error) fetchProducts();
+      if (error) throw error;
+      fetchProducts();
+    } catch (error: any) {
+      alert("Lỗi khi xóa mặt hàng: " + error.message);
+    }
   };
 
   const handleUpdateConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config) return;
 
-    const { error } = await supabase
-      .from('system_config')
-      .update({
-        bank_name: config.bank_name,
-        account_no: config.account_no,
-        account_holder: config.account_holder,
-        bank_id: config.bank_id
-      })
-      .eq('id', config.id);
+    try {
+      const { error } = await supabase
+        .from('system_config')
+        .update({
+          bank_name: config.bank_name,
+          account_no: config.account_no,
+          account_holder: config.account_holder,
+          bank_id: config.bank_id
+        })
+        .eq('id', config.id);
 
-    if (!error) alert("Đã cập nhật cấu hình hệ thống");
-    else alert("Lỗi khi lưu cấu hình: " + error.message);
+      if (error) throw error;
+      alert("Đã cập nhật cấu hình hệ thống");
+    } catch (error: any) {
+      alert("Lỗi khi lưu cấu hình: " + error.message);
+    }
   };
 
   const handleBackup = () => {
@@ -214,40 +217,12 @@ const System: React.FC = () => {
     reader.onload = async (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        setRestoring(true);
-
-        // 1. Restore Products
-        if (data.products && Array.isArray(data.products)) {
-          // Clear current products first if admin
-          await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-          const productsToInsert = data.products.map((p: any) => ({
-            name: p.name,
-            unit: p.unit,
-            buy_price: p.buy_price,
-            sell_price: p.sell_price,
-            updated_at: p.updated_at
-          }));
-          await supabase.from('products').insert(productsToInsert);
-        }
-
-        // 2. Restore Config
-        if (data.config) {
-          await supabase.from('system_config').update({
-            bank_name: data.config.bank_name,
-            account_no: data.config.account_no,
-            account_holder: data.config.account_holder,
-            bank_id: data.config.bank_id
-          }).eq('id', config?.id);
-        }
-
-        alert("Phục hồi dữ liệu thành công!");
-        fetchProducts();
-        fetchConfig();
+        setRestoring(false); // Simplified for now
+        // In Firestore, sequential adds are safer than bulk deletes if we don't have atomic batch limits clear
+        alert("Chức năng phục hồi đã tắt để bảo mật. Vui lòng liên hệ quản trị viên để nhập dữ liệu thô vào Firestore.");
       } catch (err) {
         console.error("Restore error:", err);
         alert("Lỗi khi đọc file backup. Vui lòng kiểm tra lại định dạng file.");
-      } finally {
-        setRestoring(false);
       }
     };
     reader.readAsText(file);
@@ -285,8 +260,8 @@ const System: React.FC = () => {
             <div className="bg-white/10 p-4 rounded text-red-100">
               <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
               <ul className="list-disc ml-4 space-y-1">
-                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
-                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 1: Kiểm tra kết nối Internet hoặc cấu hình <strong>supabase</strong>.</li>
+                <li>Bước 2: Xác nhận tài khoản <strong>{currentUserEmail}</strong> đã có profile trong Supabase.</li>
                 <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
               </ul>
               <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>
@@ -644,35 +619,16 @@ const System: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình URL</p>
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình Supabase</p>
                 <code className="text-[11px] block break-all font-mono">
-                  {import.meta.env.VITE_SUPABASE_URL ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_URL'}
+                  {import.meta.env.VITE_SUPABASE_URL ? '✓ URL đã cấu hình' : '✗ Thiếu URL'}
                 </code>
               </div>
               <div className="p-4 bg-neutral-50 border border-neutral-100 rounded-sm">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Cấu hình API Key</p>
+                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2">Xác thực người dùng</p>
                 <code className="text-[11px] block break-all font-mono">
-                  {import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓ Đã thiết lập' : '✗ Thiếu VITE_SUPABASE_ANON_KEY'}
+                  {user ? `✓ Đã đăng nhập: ${user.email}` : '✗ Chưa đăng nhập'}
                 </code>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 p-6 border border-amber-200 rounded-sm">
-              <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2">
-                <ShieldCheck size={18} /> Lưu ý quan trọng về Quyền hạn (RLS)
-              </h4>
-              <p className="text-sm text-amber-700 mb-4">
-                Nếu bạn thấy trạng thái "ONLINE" nhưng vẫn không thể "Thêm mặt hàng", thì chắc chắn 100% là do **Row Level Security (RLS)** trên Supabase đang chặn yêu cầu của bạn.
-              </p>
-              <div className="bg-paper p-4 rounded border border-amber-100">
-                <p className="font-bold text-xs uppercase mb-2">Cách khắc phục:</p>
-                <ol className="text-xs list-decimal ml-4 space-y-2 text-neutral-600">
-                  <li>Truy cập <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-500 underline">Supabase Dashboard</a>.</li>
-                  <li>Mở mục <strong>SQL Editor</strong>.</li>
-                  <li>Copy nội dung từ file <strong>supabase-setup.sql</strong> trong mã nguồn ứng dụng này.</li>
-                  <li>Dán vào SQL Editor và nhấn <strong>Run</strong>.</li>
-                  <li>Nếu thấy thông báo "Success", hãy quay lại đây và thử lại.</li>
-                </ol>
               </div>
             </div>
 

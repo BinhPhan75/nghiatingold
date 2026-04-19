@@ -49,8 +49,8 @@ const Transactions: React.FC = () => {
   };
 
   const fetchConfig = async () => {
-    const { data } = await supabase.from('system_config').select('*').single();
-    if (data) setConfig(data);
+    const { data } = await supabase.from('system_config').select('*').limit(1);
+    if (data && data.length > 0) setConfig(data[0]);
   };
 
   useEffect(() => {
@@ -121,7 +121,7 @@ const Transactions: React.FC = () => {
       return;
     }
 
-    const transaction: Partial<Transaction> = {
+    const transaction: Omit<Transaction, 'id'> = {
       type,
       customer_name: customerName,
       customer_cccd: customerCCCD,
@@ -134,15 +134,16 @@ const Transactions: React.FC = () => {
       total_amount: totalAmount,
       tien_mat: cashAmount,
       chuyen_khoan: transferAmount,
-      created_by: profile?.id,
+      created_at: new Date().toISOString(),
+      created_by: profile?.id || 'anonymous',
     };
 
     setLastError(null);
-    const { error } = await supabase.from('transactions').insert([transaction]);
-
-    if (!error) {
+    try {
+      const { error } = await supabase.from('transactions').insert([transaction]);
+      if (error) throw error;
+      
       if (type === 'SELL') {
-        // Use removeVietnameseTones for unaccented memo as requested
         const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`);
         if (config && config.bank_id && config.account_no && config.account_holder) {
           const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount || totalAmount, desc);
@@ -152,10 +153,9 @@ const Transactions: React.FC = () => {
           alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ.");
         }
       } else {
-        // Mode: BUY (Store buys from customer, Store pays customer)
         setShowSuccess(true);
       }
-    } else {
+    } catch (error: any) {
       setLastError(error);
       alert("Đã có lỗi xảy ra khi lưu giao dịch: " + (error.message || "Kiểm tra quyền truy cập database"));
     }
@@ -190,8 +190,8 @@ const Transactions: React.FC = () => {
             <div className="bg-white/10 p-4 rounded text-red-100">
               <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
               <ul className="list-disc ml-4 space-y-1">
-                <li>Bước 1: Copy nội dung file <strong>supabase-setup.sql</strong> trong mã nguồn.</li>
-                <li>Bước 2: Dán và chạy (Run) trong mục <strong>SQL Editor</strong> của Supabase Dashboard.</li>
+                <li>Bước 1: Kiểm tra kết nối Internet.</li>
+                <li>Bước 2: Đảm bảo bảng <strong>transactions</strong> đã được cấu hình Policy trên Supabase.</li>
                 <li>Bước 3: Tải lại trang này (F5) và thử lại.</li>
               </ul>
               <p className="mt-4 italic text-[10px]">Tài khoản đang đăng nhập: <span className="font-bold text-white">{currentUserEmail}</span></p>

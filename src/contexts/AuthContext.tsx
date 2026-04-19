@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { User } from '@supabase/supabase-js';
 import { Profile, UserRole } from '../types';
 
 interface AuthContextType {
-  user: any | null;
+  user: User | null;
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
@@ -15,9 +16,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [loading, setLoading] = useState(true);
+
+  const isSupabaseConfigured = Boolean(
+    import.meta.env.VITE_SUPABASE_URL && 
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -25,44 +31,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    let mounted = true;
-    let subscription: { unsubscribe: () => void } | null = null;
-
-    const setupAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          }
-        }
-      } catch (err) {
-        console.error("Auth initialization error:", err);
-      } finally {
-        if (mounted) setLoading(false);
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
       }
+    });
 
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (mounted) {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          } else {
-            setProfile(null);
-          }
-          setLoading(false);
-        }
-      });
-      subscription = data.subscription;
-    };
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
 
-    setupAuth();
-
-    return () => {
-      mounted = false;
-      if (subscription) subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchProfile = async (uid: string) => {
@@ -73,11 +63,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', uid)
         .single();
 
-      if (!error && data) {
-        setProfile(data);
-      }
+      if (error) throw error;
+      setProfile(data as Profile);
     } catch (err) {
       console.error("Profile fetch error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 

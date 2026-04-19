@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Transaction, Product } from '../../types';
+import { Transaction, Product, Profile } from '../../types';
 import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
-
 import { useAuth } from '../../contexts/AuthContext';
 
 const Reports: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<(Transaction & { salesperson?: Profile })[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastError, setLastError] = useState<any>(null);
@@ -36,16 +35,12 @@ const Reports: React.FC = () => {
   }, []);
 
   const checkConnection = async () => {
-    try {
-      const { error } = await supabase.from('transactions').select('count', { count: 'exact', head: true });
-      if (error) throw error;
+    const { error } = await supabase.from('transactions').select('id', { count: 'exact', head: true });
+    if (error) {
+      setDbStatus({ connected: false, message: 'Không thể kết nối tới cơ sở dữ liệu Supabase.' });
+      setLastError(error);
+    } else {
       setDbStatus({ connected: true, message: '' });
-    } catch (err: any) {
-      setDbStatus({ 
-        connected: false, 
-        message: err.message || 'Không thể kết nối tới cơ sở dữ liệu.' 
-      });
-      setLastError(err);
     }
   };
 
@@ -56,18 +51,27 @@ const Reports: React.FC = () => {
 
   const fetchTransactions = async () => {
     setLoading(true);
-    let query = supabase
-      .from('transactions')
-      .select('*, salesperson:profiles!created_by(email, full_name)')
-      .gte('created_at', `${startDate}T00:00:00`)
-      .lte('created_at', `${endDate}T23:59:59`)
-      .order('created_at', { ascending: false });
-
-    if (productId) query = query.eq('product_id', productId);
-    if (customerCCCD) query = query.ilike('customer_cccd', `%${customerCCCD}%`);
-
     try {
+      let query = supabase
+        .from('transactions')
+        .select(`
+          *,
+          salesperson:profiles(*)
+        `)
+        .gte('created_at', `${startDate}T00:00:00`)
+        .lte('created_at', `${endDate}T23:59:59`)
+        .order('created_at', { ascending: false });
+
+      if (productId) {
+        query = query.eq('product_id', productId);
+      }
+
+      if (customerCCCD) {
+        query = query.ilike('customer_cccd', `%${customerCCCD}%`);
+      }
+
       const { data, error } = await query;
+
       if (error) throw error;
       setTransactions(data || []);
       setLastError(null);
@@ -165,47 +169,6 @@ const Reports: React.FC = () => {
               <p className="text-sm text-red-700 mb-4 font-medium">
                 {lastError.message || 'Có lỗi xảy ra khi tải báo cáo.'}
               </p>
-              
-              {lastError.code === '42P01' ? (
-                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
-                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Nguyên nhân: Thiếu bảng giao dịch</p>
-                  <p className="text-xs text-red-700">Database của bạn chưa có bảng <strong>transactions</strong>. Vui lòng chạy script cài đặt trong mục Hệ Thống.</p>
-                </div>
-              ) : lastError.message?.includes('relationship') ? (
-                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
-                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Lỗi quan hệ database (Relationship Error)</p>
-                  <p className="text-[11px] text-red-700 mb-3">PostgREST không tìm thấy liên kết giữa bảng giao dịch và thông tin nhân viên. Bạn cần chạy lệnh SQL sau để sửa:</p>
-                  <div className="bg-black text-[10px] p-3 font-mono text-green-400 select-all whitespace-pre overflow-x-auto">
-{`ALTER TABLE transactions 
-DROP CONSTRAINT IF EXISTS transactions_created_by_fkey;
-
-ALTER TABLE transactions 
-ADD CONSTRAINT transactions_created_by_fkey 
-FOREIGN KEY (created_by) REFERENCES profiles(id);`}
-                  </div>
-                </div>
-              ) : (lastError.code === 'PGRST301' || lastError.message?.includes('JWT')) ? (
-                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
-                  <p className="font-bold text-xs text-red-800 uppercase mb-2">Nguyên nhân: Hết hạn phiên làm việc</p>
-                  <p className="text-xs text-red-700">Vui lòng đăng xuất và đăng nhập lại để làm mới quyền truy cập.</p>
-                </div>
-              ) : (lastError.message?.includes('permission denied') || !dbStatus.connected) && (
-                <div className="bg-white/50 p-4 rounded border border-red-100 mb-4">
-                  <p className="font-bold text-xs text-red-800 uppercase mb-2 text-center py-2 bg-red-100 mb-3">Chẩn đoán lỗi RLS (Quyền truy cập)</p>
-                  <div className="space-y-3 text-[11px] text-red-900 leading-relaxed font-medium">
-                    <p>Hệ thống không thể đọc dữ liệu báo cáo. Điều này thường do <strong>Row Level Security (RLS)</strong> chưa được cấu hình cho tài khoản của bạn.</p>
-                    <div className="bg-white p-2 border border-red-200 font-mono text-[10px]">
-                      Email hiện tại: <span className="font-bold select-all underline text-blue-600">{currentUserEmail || 'n/a'}</span>
-                    </div>
-                    <p>Để khắc phục:</p>
-                    <ol className="list-decimal ml-4 space-y-1">
-                      <li>Vào mục <strong>Hệ Thống</strong> &rarr; <strong>Kiểm Tra Kết Nối</strong></li>
-                      <li>Copy email ở trên dán vào file <strong>supabase-setup.sql</strong></li>
-                      <li>Chạy SQL script đó trong trang quản trị Supabase</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
               
               <button 
                 onClick={() => { setLastError(null); fetchTransactions(); }}

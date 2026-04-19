@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import { Briefcase, LogIn, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -11,38 +11,24 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  if (!isSupabaseConfigured) {
-    return <Navigate to="/" replace />;
-  }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    try {
-      // Map 'admin' username to 'binhphan.070582@gmail.com' as Supabase requires email
-      const loginEmail = email.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : email;
+    // Map 'admin' username to 'binhphan.070582@gmail.com'
+    const loginEmail = email.toLowerCase() === 'admin' ? 'binhphan.070582@gmail.com' : email;
 
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password,
-      });
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password,
+    });
 
-      if (authError) {
-        if (authError.message.toLowerCase().includes('invalid login credentials') && email.toLowerCase() === 'admin' && password === '220785') {
-          setError('Tài khoản ADMIN chưa được khởi tạo. Vui lòng tạo tài khoản binhphan.070582@gmail.com với mật khẩu 220785 trong Supabase Dashboard.');
-        } else {
-          setError('Thông tin đăng nhập không chính xác');
-        }
-        setLoading(false);
-      } else if (data.session) {
-        navigate('/');
-      }
-    } catch (err: any) {
-      console.error("Login unexpected error:", err);
-      setError(err.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+    if (authError) {
+      setError('Thông tin đăng nhập không chính xác');
       setLoading(false);
+    } else {
+      navigate('/');
     }
   };
 
