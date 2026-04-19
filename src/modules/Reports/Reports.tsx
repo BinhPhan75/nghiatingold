@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Transaction, Product, Profile } from '../../types';
-import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle, X, ExternalLink, Printer } from 'lucide-react';
+import { Search, Filter, Download, ArrowUpCircle, ArrowDownCircle, X, ExternalLink, Printer, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,6 +41,28 @@ const Reports: React.FC = () => {
   const fetchBanks = async () => {
     const { data } = await supabase.from('banks').select('*');
     if (data) setBanks(data);
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa giao dịch này? Hành động này không thể hoàn tác.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      alert("Đã xóa giao dịch thành công.");
+      setSelectedTransaction(null);
+      fetchTransactions(); // Refresh list
+    } catch (err: any) {
+      console.error("Delete Error:", err);
+      alert("Lỗi khi xóa: " + err.message);
+    }
   };
 
   const checkConnection = async () => {
@@ -481,12 +503,14 @@ const Reports: React.FC = () => {
 
               {/* Modal Footer */}
               <div className="bg-neutral-50 p-6 border-t border-neutral-100 flex justify-end gap-4">
-                <button 
-                  onClick={() => window.print()}
-                  className="px-6 py-2 border border-neutral-200 text-neutral-500 text-[10px] font-black uppercase hover:bg-white hover:text-ink transition-all flex items-center gap-2"
-                >
-                  <Printer size={14} /> In phiếu
-                </button>
+                {isAdmin && (
+                  <button 
+                    onClick={() => handleDeleteTransaction(selectedTransaction.id)}
+                    className="px-6 py-2 border border-red-200 text-red-500 text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+                  >
+                    <Trash2 size={14} /> Xóa giao dịch
+                  </button>
+                )}
                 <button 
                   onClick={() => setSelectedTransaction(null)}
                   className="px-8 py-2 bg-ink text-paper text-[10px] font-black uppercase tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-md"
