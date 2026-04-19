@@ -111,6 +111,52 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Price Ticker Tape */}
+      <div className="bg-ink overflow-hidden py-3 border-y border-gold-primary/20 relative shadow-inner">
+        <div className="flex whitespace-nowrap animate-ticker">
+          <div className="flex gap-20 px-4">
+            {products.length > 0 ? (
+              // Double the array to ensure continuous scrolling
+              [...products, ...products, ...products].map((p, idx) => (
+                <div key={`${p.id}-${idx}`} className="flex items-center gap-4">
+                  <span className="text-gold-primary font-black uppercase text-[10px] tracking-widest italic">{p.name}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-paper/50 font-bold uppercase">Mua:</span>
+                      <span className="text-sm font-mono font-bold text-paper">{p.buy_price.toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-paper/50 font-bold uppercase">Bán:</span>
+                      <span className="text-sm font-mono font-bold text-gold-primary">{p.sell_price.toLocaleString()}đ</span>
+                    </div>
+                  </div>
+                  <div className="w-1.5 h-1.5 rounded-full bg-gold-primary/30 mx-4" />
+                </div>
+              ))
+            ) : (
+              <span className="text-paper/40 text-[10px] uppercase font-black tracking-widest">Đang cập nhật bảng giá niêm yết...</span>
+            )}
+          </div>
+        </div>
+        <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-ink to-transparent z-10" />
+        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-ink to-transparent z-10" />
+      </div>
+
+      <style>{`
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-ticker {
+          display: flex;
+          width: fit-content;
+          animation: ticker 60s linear infinite;
+        }
+        .animate-ticker:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
       {/* Hero Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
