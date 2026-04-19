@@ -40,6 +40,7 @@ export interface Transaction {
   total_amount: number;
   tien_mat: number;
   chuyen_khoan: number;
+  chiet_khau: number;
   customer_bank_id?: string;
   customer_account_no?: string;
   created_at: string;

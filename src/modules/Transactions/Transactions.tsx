@@ -26,6 +26,7 @@ const Transactions: React.FC = () => {
   const [customerAccountNo, setCustomerAccountNo] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
+  const [discount, setDiscount] = useState<number>(0);
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
@@ -118,7 +119,8 @@ const Transactions: React.FC = () => {
   }, [selectedProduct, type]);
 
   const currentPrice = customPrice;
-  const totalAmount = currentPrice * quantity;
+  const subtotal = currentPrice * quantity;
+  const totalAmount = Math.max(0, subtotal - discount);
 
   useEffect(() => {
     // Default: transferAmount = totalAmount, cashAmount = 0
@@ -190,6 +192,7 @@ const Transactions: React.FC = () => {
       unit: selectedProduct.unit,
       price_per_unit: currentPrice,
       total_amount: totalAmount,
+      chiet_khau: discount,
       tien_mat: cashAmount,
       chuyen_khoan: transferAmount,
       created_at: new Date().toISOString(),
@@ -237,6 +240,7 @@ const Transactions: React.FC = () => {
     setCustomerCCCD('');
     setCustomerAddress('');
     setQuantity(1);
+    setDiscount(0);
     setCashAmount(0);
     setTransferAmount(0);
     setSelectedProduct(null);
@@ -405,6 +409,15 @@ const Transactions: React.FC = () => {
               />
             </div>
             <div className="input-field">
+              <label>Chiết khấu (VND)</label>
+              <input 
+                type="text"
+                value={formatNumberWithSeparator(discount)}
+                className="font-mono font-bold text-neutral-600"
+                onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
+              />
+            </div>
+            <div className="input-field">
               <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
               <input 
                 type="text"
@@ -438,9 +451,21 @@ const Transactions: React.FC = () => {
         </div>
 
         <div className="mt-4 pt-6 border-t border-neutral-100">
-          <div className="flex justify-between items-center mb-6">
-            <span className="text-[10px] uppercase font-black text-neutral-400">Tổng thanh toán</span>
-            <span className="text-4xl font-black text-ink">{formatCurrency(totalAmount)}</span>
+          <div className="flex flex-col gap-2 mb-6">
+            <div className="flex justify-between items-center text-neutral-400">
+              <span className="text-[10px] uppercase font-black">Thành tiền</span>
+              <span className="text-lg font-bold">{formatCurrency(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between items-center text-red-400 italic">
+                <span className="text-[10px] uppercase font-black">Chiết khấu (-)</span>
+                <span className="text-lg font-bold">-{formatCurrency(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-neutral-50">
+              <span className="text-[10px] uppercase font-black text-neutral-400">Cần thanh toán</span>
+              <span className="text-4xl font-black text-ink">{formatCurrency(totalAmount)}</span>
+            </div>
           </div>
 
           <button 
