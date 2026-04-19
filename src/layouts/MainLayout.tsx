@@ -86,8 +86,8 @@ const MainLayout: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Bottom Navigation */}
-        <div className="md:hidden flex h-16 bg-ink border-t border-gold-primary/10 shrink-0">
+        {/* Mobile Bottom Navigation - FIXED TO BOTTOM */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-ink border-t border-gold-primary/10 flex z-40">
           {filteredNavItems.map((item) => (
             <NavLink
               key={item.to}
