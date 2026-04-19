@@ -171,7 +171,7 @@ const Login: React.FC = () => {
 
         <div className="mt-8 pt-6 border-t border-neutral-100 text-center">
           <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">
-            &copy; 2026 NGHIATIN GOLD. All Rights Reserved.
+            &copy; 2026 BINHPHAN. All Rights Reserved.
           </p>
         </div>
       </motion.div>
