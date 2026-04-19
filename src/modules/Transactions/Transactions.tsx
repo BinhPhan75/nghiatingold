@@ -34,6 +34,53 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
 
+  // Handheld Scanner Support
+  const scanBuffer = React.useRef<string>('');
+  const lastKeyTime = React.useRef<number>(0);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if in diagnostic or specific contexts where we don't want to steal focus
+      if (showScanner || showSuccess || showQR) return;
+      
+      // Scanners usually send keys very fast (< 30ms)
+      const now = Date.now();
+      const isFast = now - lastKeyTime.current < 50;
+      lastKeyTime.current = now;
+
+      if (e.key === 'Enter') {
+        const data = scanBuffer.current.trim();
+        if (data.includes('|') && data.split('|').length >= 6) {
+          e.preventDefault();
+          const info = parseCCCD(data);
+          if (info) {
+            setCustomerName(info.name);
+            setCustomerCCCD(info.id);
+            if (info.address) setCustomerAddress(info.address);
+            scanBuffer.current = '';
+            // Optional: visual feedback
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4';
+            notification.innerText = 'Đã nhận dạng CCCD từ máy quét';
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+          }
+        }
+        scanBuffer.current = '';
+      } else if (e.key.length === 1) {
+        if (!isFast && scanBuffer.current.length > 0) {
+          // If it was slow, reset buffer because it's manual typing
+          scanBuffer.current = e.key;
+        } else {
+          scanBuffer.current += e.key;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [showScanner, showSuccess, showQR]);
+
   useEffect(() => {
     const searchType = searchParams.get('type');
     if (searchType === 'BUY' || searchType === 'SELL') {
@@ -260,12 +307,17 @@ const Transactions: React.FC = () => {
         <div className="flex flex-col gap-5">
           <div className="flex justify-between items-end">
             <h3 className="text-2xl m-0">{type === 'SELL' ? 'Khách mua' : 'Mua của khách'}</h3>
-            <button 
-              onClick={() => setShowScanner(true)}
-              className="flex items-center gap-2 text-[10px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
-            >
-              <Camera size={16} /> Quét CCCD
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-neutral-100 rounded-sm text-[8px] font-black text-neutral-400 uppercase tracking-tighter" title="Hệ thống tự động nhận diện máy quét cổng USB/Bluetooth">
+                <QrCode size={10} /> Máy quét cầm tay SẴN SÀNG
+              </div>
+              <button 
+                onClick={() => setShowScanner(true)}
+                className="flex items-center gap-2 text-[10px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
+              >
+                <Camera size={16} /> Quét CCCD
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
