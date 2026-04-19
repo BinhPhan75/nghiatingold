@@ -176,6 +176,14 @@ const Transactions: React.FC = () => {
   const { user } = useAuth();
   const currentUserEmail = user?.email;
 
+  const formatNumberWithSeparator = (val: number) => {
+    return new Intl.NumberFormat('vi-VN').format(val);
+  };
+
+  const parseNumberFromSeparator = (val: string) => {
+    return Number(val.replace(/\./g, ''));
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {lastError && (
@@ -297,10 +305,10 @@ const Transactions: React.FC = () => {
             <div className="input-field">
               <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
               <input 
-                type="number"
-                value={customPrice}
+                type="text"
+                value={formatNumberWithSeparator(customPrice)}
                 className="font-mono font-bold text-lg bg-neutral-50 focus:bg-white"
-                onChange={(e) => setCustomPrice(Number(e.target.value))}
+                onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
               />
             </div>
           </div>
@@ -309,19 +317,19 @@ const Transactions: React.FC = () => {
             <div className="input-field">
               <label className="text-vcb-green font-bold uppercase text-[9px]">Chuyển khoản (VND)</label>
               <input 
-                type="number"
-                value={transferAmount}
+                type="text"
+                value={formatNumberWithSeparator(transferAmount)}
                 className="bg-vcb-blue/5 border-vcb-blue/20"
-                onChange={(e) => handleTransferChange(Number(e.target.value))}
+                onChange={(e) => handleTransferChange(parseNumberFromSeparator(e.target.value))}
               />
             </div>
             <div className="input-field">
               <label className="text-orange-600 font-bold uppercase text-[9px]">Tiền mặt (VND)</label>
               <input 
-                type="number"
-                value={cashAmount}
+                type="text"
+                value={formatNumberWithSeparator(cashAmount)}
                 className="bg-orange-50 border-orange-200"
-                onChange={(e) => handleCashChange(Number(e.target.value))}
+                onChange={(e) => handleCashChange(parseNumberFromSeparator(e.target.value))}
               />
             </div>
           </div>

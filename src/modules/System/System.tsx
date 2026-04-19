@@ -228,6 +228,14 @@ const System: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const formatNumberWithSeparator = (val: number) => {
+    return new Intl.NumberFormat('vi-VN').format(val);
+  };
+
+  const parseNumberFromSeparator = (val: string) => {
+    return Number(val.replace(/\./g, ''));
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-end mb-6">
@@ -328,17 +336,17 @@ const System: React.FC = () => {
                   <div className="input-field">
                     <label>Giá mua</label>
                     <input 
-                      type="number" 
-                      value={newProduct.buy_price}
-                      onChange={e => setNewProduct({...newProduct, buy_price: Number(e.target.value)})}
+                      type="text" 
+                      value={formatNumberWithSeparator(newProduct.buy_price)}
+                      onChange={e => setNewProduct({...newProduct, buy_price: parseNumberFromSeparator(e.target.value)})}
                     />
                   </div>
                   <div className="input-field">
                     <label>Giá bán</label>
                     <input 
-                      type="number" 
-                      value={newProduct.sell_price}
-                      onChange={e => setNewProduct({...newProduct, sell_price: Number(e.target.value)})}
+                      type="text" 
+                      value={formatNumberWithSeparator(newProduct.sell_price)}
+                      onChange={e => setNewProduct({...newProduct, sell_price: parseNumberFromSeparator(e.target.value)})}
                     />
                   </div>
                   <div className="md:col-span-4 flex justify-end">
@@ -368,23 +376,23 @@ const System: React.FC = () => {
                       <td className="py-4 font-medium text-neutral-500">{p.unit}</td>
                       <td className="py-4">
                         <input 
-                          type="number" 
-                          className="w-full md:w-32 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
-                          value={editingPrices[p.id]?.buy_price ?? p.buy_price} 
+                          type="text" 
+                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          value={formatNumberWithSeparator(editingPrices[p.id]?.buy_price ?? p.buy_price)} 
                           onChange={(e) => setEditingPrices(prev => ({
                             ...prev,
-                            [p.id]: { ...prev[p.id], buy_price: Number(e.target.value) }
+                            [p.id]: { ...prev[p.id], buy_price: parseNumberFromSeparator(e.target.value) }
                           }))}
                         />
                       </td>
                       <td className="py-4">
                         <input 
-                          type="number" 
-                          className="w-full md:w-32 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
-                          value={editingPrices[p.id]?.sell_price ?? p.sell_price} 
+                          type="text" 
+                          className="w-full md:w-40 p-2 border border-neutral-100 font-mono font-bold text-sm bg-neutral-50 focus:bg-white focus:border-ink outline-none"
+                          value={formatNumberWithSeparator(editingPrices[p.id]?.sell_price ?? p.sell_price)} 
                           onChange={(e) => setEditingPrices(prev => ({
                             ...prev,
-                            [p.id]: { ...prev[p.id], sell_price: Number(e.target.value) }
+                            [p.id]: { ...prev[p.id], sell_price: parseNumberFromSeparator(e.target.value) }
                           }))}
                         />
                       </td>
