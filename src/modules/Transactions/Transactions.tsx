@@ -268,7 +268,7 @@ const Transactions: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="input-field">
               <label>Họ tên khách hàng</label>
               <input 
@@ -342,7 +342,7 @@ const Transactions: React.FC = () => {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="input-field">
               <label>Số lượng ({selectedProduct?.unit || 'đơn vị'})</label>
               <input 
@@ -363,7 +363,7 @@ const Transactions: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed border-neutral-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-dashed border-neutral-200">
             <div className="input-field">
               <label className="text-vcb-green font-bold uppercase text-[9px]">Chuyển khoản (VND)</label>
               <input 
