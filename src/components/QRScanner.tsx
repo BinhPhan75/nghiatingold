@@ -24,17 +24,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 15, 
-          qrbox: { width: 300, height: 300 }, // Square box is more stable for autofocus on many devices
-          aspectRatio: 1.0
+          fps: 10, 
+          qrbox: { width: 320, height: 200 }, // Rectangular for CCCD
+          aspectRatio: 1.586
         };
 
         await html5QrCode.start(
-          { 
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 } 
-          }, 
+          { facingMode: "environment" }, 
           config, 
           (decodedText) => {
             // Priority 1: QR code scanning (Machine readable)
@@ -143,7 +139,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           </button>
         </div>
         
-        <div className="relative aspect-square bg-black overflow-hidden shadow-inner border-y border-gold-primary/20">
+        <div className="relative aspect-[1.586/1] bg-black overflow-hidden shadow-inner border-y border-gold-primary/20">
           <div id="reader" className="w-full h-full"></div>
           
           {(isInitializing || isScanningFile || isProcessing) && (
