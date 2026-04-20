@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { X, Camera, RefreshCw, QrCode, Upload, Zap, Sparkles, XCircle } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { X, Camera, RefreshCw, Upload, Zap, Sparkles, XCircle, FlipHorizontal } from 'lucide-react';
 import { analyzeCCCDImage } from '../services/geminiService';
 
 interface QRScannerProps {
@@ -14,57 +14,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [currentCameraIdx, setCurrentCameraIdx] = useState(0);
 
-  const [isScanningFile, setIsScanningFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const startScanner = async () => {
-      try {
-        console.log("Initializing Scanner...");
-        const html5QrCode = new Html5Qrcode('reader');
-        scannerRef.current = html5QrCode;
-
-        const config = { 
-          fps: 20, 
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const boxSize = Math.floor(minEdge * 0.7);
-            return { width: boxSize, height: boxSize };
-          },
-          aspectRatio: 4/3,
-          videoConstraints: {
-            facingMode: "environment"
-          }
-        };
-
-        await html5QrCode.start(
-          { facingMode: "environment" }, 
-          config, 
-          (decodedText) => {
-            console.log("Data Scanned:", decodedText);
-            if (!paused && !isProcessing) {
-              // Haptic feedback
-              if (navigator.vibrate) navigator.vibrate(50);
-              onScan(decodedText);
-            }
-          },
-          () => { }
-        );
-        setIsInitializing(false);
-      } catch (err: any) {
-        console.error("Scanner error:", err);
-        setError("Chưa bật camera hoặc lỗi: " + (err.message || String(err)));
-        setIsInitializing(true); // Keep initializing state to show simple error or trial
-      }
-    };
-
-    startScanner();
-
-    return () => {
-      stopScanner();
-    };
-  }, []);
 
   const stopScanner = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
@@ -74,6 +29,105 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
       } catch (err) {
         console.error("Stop error:", err);
       }
+    }
+  };
+
+  const startScanner = async (idx?: number) => {
+    setIsInitializing(true);
+    setError(null);
+    const cameraIdx = idx !== undefined ? idx : currentCameraIdx;
+
+    try {
+      if (scannerRef.current) {
+        await stopScanner();
+      }
+
+      const html5QrCode = new Html5Qrcode('reader');
+      scannerRef.current = html5QrCode;
+
+      const deviceList = await Html5Qrcode.getCameras();
+      setCameras(deviceList);
+
+      let cameraConfig: any = { facingMode: "environment" };
+      if (deviceList.length > 0) {
+        const selectedId = deviceList[cameraIdx % deviceList.length].id;
+        cameraConfig = { deviceId: { exact: selectedId } };
+      }
+
+      const config = { 
+        fps: 25, 
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const boxSize = Math.floor(minEdge * 0.7);
+          return { width: boxSize, height: boxSize };
+        },
+        aspectRatio: 1.333333,
+        videoConstraints: {
+          ...cameraConfig,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+
+      await html5QrCode.start(
+        cameraConfig, 
+        config, 
+        (decodedText) => {
+          if (!paused && !isProcessing) {
+            if (navigator.vibrate) navigator.vibrate(50);
+            onScan(decodedText);
+          }
+        },
+        () => { }
+      );
+
+      setIsInitializing(false);
+      
+      // Check capabilities for torch
+      try {
+        const video = document.querySelector('#reader video') as HTMLVideoElement;
+        const track = (video?.srcObject as MediaStream)?.getVideoTracks()[0];
+        const capabilities: any = track?.getCapabilities();
+        setHasTorch(!!capabilities?.torch);
+      } catch (e) {
+        setHasTorch(false);
+      }
+    } catch (err: any) {
+      console.error("Scanner start error:", err);
+      setError("Không thể mở camera. Hãy cấp quyền hoặc dùng 'Tải ảnh'.");
+      setIsInitializing(false);
+    }
+  };
+
+  useEffect(() => {
+    startScanner();
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
+  const switchCamera = () => {
+    if (cameras.length < 2) return;
+    const nextIdx = (currentCameraIdx + 1) % cameras.length;
+    setCurrentCameraIdx(nextIdx);
+    startScanner(nextIdx);
+  };
+
+  const toggleTorch = async () => {
+    if (!hasTorch) return;
+    try {
+      const video = document.querySelector('#reader video') as HTMLVideoElement;
+      const track = (video?.srcObject as MediaStream)?.getVideoTracks()[0];
+      if (track) {
+        const newState = !torchOn;
+        await track.applyConstraints({
+          //@ts-ignore
+          advanced: [{ torch: newState }]
+        });
+        setTorchOn(newState);
+      }
+    } catch (e) {
+      console.error("Torch error:", e);
     }
   };
 
@@ -92,28 +146,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
       if (!ctx) return;
       
       ctx.drawImage(video, 0, 0);
-      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
-      // 1. Try QR first on this frame
-      try {
-        const qrResult = await scannerRef.current.scanFile(new File([await (await fetch(base64Image)).blob()], "capture.jpg"), true);
-        onScan(qrResult);
-        setIsProcessing(false);
-        return;
-      } catch (e) {
-        // No QR found in frame, move to AI
-      }
-
-      // 2. AI Analysis
-      const info = await analyzeCCCDImage(base64Image);
-      if (info) {
-        onScan(info);
+      const result = await analyzeCCCDImage(base64Image);
+      if (result) {
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+        onScan(result);
       } else {
-        setError("AI không thể nhận diện được thông tin. Vui lòng chụp rõ nét hơn, đủ ánh sáng và không bị lóa.");
+        setError("AI không nhận diện được. Hãy giữ thẻ phẳng, rõ nét và chụp lại.");
       }
-    } catch (err) {
-      console.error("Capture Analysis Error:", err);
-      alert("Lỗi khi xử lý hình ảnh. Vui lòng thử lại.");
+    } catch (e) {
+      console.error("Capture Analysis Error:", e);
+      setError("Lỗi xử lý ảnh. Vui lòng thử lại.");
     } finally {
       setIsProcessing(false);
     }
@@ -123,13 +167,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setIsScanningFile(true);
+    setIsProcessing(true);
     try {
-      const html5QrCode = new Html5Qrcode('reader', false);
-      const result = await html5QrCode.scanFile(file, true);
-      onScan(result);
-    } catch (err) {
-      // If QR fails on file, try AI
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = e.target?.result as string;
@@ -137,112 +176,154 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         if (info) {
           onScan(info);
         } else {
-          alert("Không tìm thấy mã QR trong ảnh. AI cũng không thể nhận diện được thông tin.");
+          setError("Không bóc tách được thông tin từ file này.");
         }
+        setIsProcessing(false);
       };
       reader.readAsDataURL(file);
-    } finally {
-      setIsScanningFile(false);
+    } catch (err) {
+      setError("Lỗi khi đọc file.");
+      setIsProcessing(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-sm w-full max-w-md overflow-hidden relative shadow-2xl border-2 border-gold-primary/30">
-        <div className="p-4 border-b flex justify-between items-center bg-ink text-paper text-sm">
-          <div className="flex items-center gap-2">
-            <Camera size={18} className="text-gold-primary" />
-            <h3 className="font-black text-xs uppercase tracking-[0.2em] m-0">Máy Quét CCCD AI</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 md:p-4 backdrop-blur-md">
+      <div className="bg-paper rounded-sm w-full max-w-lg overflow-hidden relative shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col">
+        {/* Header */}
+        <div className="p-4 bg-ink text-paper flex justify-between items-center border-b border-gold-primary/20">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gold-primary/20 rounded-full flex items-center justify-center text-gold-primary border border-gold-primary/30">
+              <Camera size={16} />
+            </div>
+            <div>
+              <h3 className="font-black text-[11px] uppercase tracking-[0.25em] leading-none m-0">CCCD Smart Scanner</h3>
+              <p className="text-[8px] text-paper/40 uppercase tracking-widest mt-1">Phòng Lab AI NGHIATIN</p>
+            </div>
           </div>
-          <button onClick={onClose} className="hover:text-gold-primary transition-colors p-1">
-            <X size={24} />
+          <button onClick={onClose} className="text-paper/60 hover:text-gold-primary transition-all p-2 -mr-2 bg-white/5 rounded-full">
+            <X size={20} />
           </button>
         </div>
         
-        <div className="relative aspect-[4/3] bg-black overflow-hidden shadow-inner">
+        {/* Viewfinder */}
+        <div className="relative aspect-[3/4] md:aspect-[4/3] bg-black overflow-hidden group">
           <div id="reader" className="w-full h-full [&>video]:object-cover"></div>
           
-          {(isInitializing || isScanningFile || isProcessing) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/60 backdrop-blur-sm z-10">
-              <RefreshCw className="animate-spin mb-4 text-gold-primary" size={32} />
-              <p className="text-[10px] uppercase font-black tracking-widest text-center px-8">
-                {isScanningFile ? 'Đang phân tích file ảnh...' : isProcessing ? 'AI đang nhận diện thông tin...' : 'Đang khởi động camera...'}
+          {/* Diagnostic Overlay */}
+          {(isInitializing || isProcessing) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-ink/80 backdrop-blur-xl z-30">
+              <div className="relative">
+                <RefreshCw className="animate-spin mb-6 text-gold-primary" size={64} strokeWidth={1} />
+                <Sparkles className="absolute -top-2 -right-2 text-gold-primary animate-pulse" size={24} />
+              </div>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gold-primary text-center px-12 leading-relaxed">
+                {isInitializing ? 'Đang hiệu chuẩn ống kính...' : 'AI đang bóc tách thực thể...'}
               </p>
             </div>
           )}
 
           {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 text-white bg-red-900/40 backdrop-blur-md z-20">
-              <XCircle className="mb-4 text-red-500" size={48} />
-              <p className="text-xs font-bold leading-relaxed px-4">{error}</p>
-              <div className="flex gap-2 mt-6">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-red-950/90 backdrop-blur-2xl z-40 text-white">
+              <XCircle className="mb-6 text-red-500 animate-bounce" size={64} strokeWidth={1.5} />
+              <h4 className="text-lg font-black mb-3 uppercase tracking-wider">Lỗi Nhận Diện</h4>
+              <p className="text-[12px] leading-relaxed opacity-70 mb-10 max-w-xs">{error}</p>
+              <div className="flex flex-col gap-3 w-full">
                 <button 
-                  onClick={() => setError(null)}
-                  className="bg-gold-primary text-ink py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:brightness-110 active:scale-95 transition-all"
+                  onClick={() => startScanner()}
+                  className="bg-gold-primary text-ink py-4 px-10 font-bold uppercase text-[11px] tracking-[0.2em] shadow-2xl active:scale-95 transition-all"
                 >
-                  Thử lại
+                  Thử lại ngay
                 </button>
                 <button 
-                  onClick={() => window.location.reload()}
-                  className="bg-white/10 text-white py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white/20 transition-all"
+                  onClick={onClose}
+                  className="bg-white/5 py-4 px-10 font-bold uppercase text-[11px] tracking-[0.2em] border border-white/10 hover:bg-white/10 transition-all"
                 >
-                  Tải lại trang
+                  Thoát
                 </button>
               </div>
             </div>
           )}
 
-          {/* Overlay corner marks & SHUTTER BUTTON */}
+          {/* Framing UI */}
           {!isInitializing && !error && (
             <>
-              <div className="absolute inset-0 pointer-events-none opacity-50 z-0">
-                <div className="absolute top-8 left-8 w-12 h-12 border-t-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute top-8 right-8 w-12 h-12 border-t-4 border-r-4 border-gold-primary"></div>
-                <div className="absolute bottom-16 left-8 w-12 h-12 border-b-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute bottom-16 right-8 w-12 h-12 border-b-4 border-r-4 border-gold-primary"></div>
-                <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gold-primary/30 animate-pulse"></div>
+              <div className="absolute inset-0 pointer-events-none z-10 p-10">
+                <div className="w-full h-full border border-white/20 relative rounded-2xl">
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-8 border-l-8 border-gold-primary rounded-tl-2xl"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-8 border-r-8 border-gold-primary rounded-tr-2xl"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-8 border-l-8 border-gold-primary rounded-bl-2xl"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-8 border-r-8 border-gold-primary rounded-br-2xl"></div>
+                  
+                  {/* Laser Line */}
+                  <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-gold-primary to-transparent shadow-[0_0_20px_#D4AF37] animate-[scanner_3s_ease-in-out_infinite]"></div>
+                </div>
               </div>
-              
-              <div className="absolute bottom-10 inset-x-0 flex justify-center z-10">
-                <button 
+
+              {/* Toolbar */}
+              <div className="absolute top-6 right-6 flex flex-col gap-4 z-20">
+                {cameras.length > 1 && (
+                  <button 
+                    onClick={switchCamera}
+                    className="bg-ink/40 backdrop-blur-xl text-white w-12 h-12 flex items-center justify-center rounded-full border border-white/20 hover:bg-gold-primary hover:text-ink transition-all shadow-2xl"
+                    title="Đổi ống kính"
+                  >
+                    <FlipHorizontal size={24} />
+                  </button>
+                )}
+                {hasTorch && (
+                  <button 
+                    onClick={toggleTorch}
+                    className={`w-12 h-12 flex items-center justify-center rounded-full border transition-all shadow-2xl ${torchOn ? 'bg-gold-primary text-ink border-gold-primary' : 'bg-ink/40 backdrop-blur-xl text-white border-white/20'}`}
+                    title="Bật đèn Flash"
+                  >
+                    <Zap size={24} fill={torchOn ? "currentColor" : "none"} />
+                  </button>
+                )}
+              </div>
+
+              {/* Shutter Button Section */}
+              <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-4 z-20">
+                 <button 
                   onClick={handleManualCapture}
-                  className="group relative flex items-center justify-center"
+                  className="group relative"
                 >
-                  <div className="absolute inset-0 bg-white/20 rounded-full blur-md group-hover:bg-gold-primary/30 transition-all duration-300"></div>
-                  <div className="bg-white p-4 rounded-full shadow-2xl ring-8 ring-white/10 active:scale-90 transition-transform">
-                    <Zap size={24} className="text-ink fill-ink" />
+                  <div className="absolute inset-0 bg-gold-primary/20 rounded-full blur-2xl group-hover:bg-gold-primary/40 transition-all"></div>
+                  <div className="bg-white w-20 h-20 rounded-full shadow-[0_0_40px_rgba(255,255,255,0.4)] flex items-center justify-center ring-8 ring-white/10 active:scale-90 transition-all border-4 border-ink">
+                    <Sparkles size={32} className="text-ink" />
                   </div>
-                  <p className="absolute -bottom-6 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-60">Chụp & AI Phân Tích</p>
                 </button>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Chụp Để AI Phân Tích</p>
               </div>
             </>
           )}
         </div>
         
-        {!(isInitializing || error) && (
-          <div className="p-4 bg-neutral-50 border-t border-neutral-100 italic flex justify-between items-center px-6">
-            <p className="text-[10px] text-ink font-medium leading-relaxed max-w-[180px]">
-              Căn chỉnh thẻ CCCD vào khung hình rồi nhấn nút chụp để AI bốc tách thông tin.
-            </p>
-            <div className="flex gap-2">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                accept="image/*" 
-                className="hidden" 
-              />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-paper border border-ink/10 p-2.5 rounded shadow-sm text-ink hover:bg-gold-primary transition-all flex items-center gap-2 text-[9px] font-black uppercase tracking-widest"
-                title="Tải ảnh CCCD"
-              >
-                <Upload size={14} /> Tải ảnh
-              </button>
-            </div>
+        {/* Footer info */}
+        <div className="p-6 bg-paper grid grid-cols-2 gap-4">
+          <button 
+             onClick={() => fileInputRef.current?.click()}
+             className="col-span-2 bg-neutral-100 py-4 px-6 font-black uppercase text-[11px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all flex items-center justify-center gap-3 border border-ink/5"
+          >
+            <Upload size={16} /> Tải ảnh thẻ gốc
+          </button>
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+          
+          <div className="col-span-2 flex items-center gap-3 opacity-40">
+            <div className="flex-1 h-[1px] bg-ink"></div>
+            <span className="text-[8px] font-black uppercase tracking-widest">NGHIATIN Lab AI v2.4</span>
+            <div className="flex-1 h-[1px] bg-ink"></div>
           </div>
-        )}
+        </div>
       </div>
+      <style>{`
+        @keyframes scanner {
+          0% { top: 5%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { top: 95%; opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 };
