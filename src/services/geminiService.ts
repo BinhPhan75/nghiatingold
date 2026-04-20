@@ -13,7 +13,7 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         {
           parts: [
             {
-              text: "Trích xuất thông tin từ thẻ Căn cước Việt Nam hoặc Căn cước điện tử (VNeID). Xác định loại thẻ: 'OLD' (Căn cước công dân cũ) hoặc 'NEW' (Thẻ Căn cước mới 2024/Căn cước điện tử). Trả về JSON với: id (số thẻ), name (họ tên), dob (ngày sinh), gender (giới tính), address (địa chỉ), cardType ('OLD' hoặc 'NEW'). Nếu không thấy địa chỉ, hãy để trống. Chỉ trả về JSON."
+              text: "Trích xuất thông tin từ thẻ Căn cước Việt Nam. Hãy xác định loại thẻ: 'OLD' (nếu thẻ ghi 'Căn cước công dân') hoặc 'NEW' (nếu thẻ ghi 'Căn cước' - mẫu 2024). Trả về JSON với các trường: id (số thẻ), name (họ tên), dob (ngày sinh), gender (giới tính), address (địa chỉ/nơi cư trú), cardType ('OLD' hoặc 'NEW'). Nếu không thấy địa chỉ (thường gặp ở mặt trước thẻ 'NEW'), hãy để trống trường address. Chỉ trả về JSON."
             },
             {
               inlineData: {

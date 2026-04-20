@@ -481,7 +481,7 @@ const Transactions: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-[9px] text-gold-dark font-black uppercase mt-1 tracking-widest flex justify-between items-center bg-gold-primary/10 px-2 py-1 rounded-sm border border-gold-primary/20"
               >
-                <span>&rarr; Đã nhận diện mẫu thẻ mới/điện tử. Vui lòng quét MẶT SAU hoặc mã VNeID để lấy ĐỊA CHỈ</span>
+                <span>&rarr; Đã nhận diện thẻ mới. Vui lòng quét MẶT SAU để lấy ĐỊA CHỈ</span>
                 <button 
                   onClick={() => setIsWaitingForBackScan(false)}
                   className="text-[8px] underline decoration-dotted underline-offset-2 hover:text-ink"
