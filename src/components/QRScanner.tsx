@@ -53,33 +53,68 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const startCamera = useCallback(async () => {
     setIsInitializing(true);
     setError(null);
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      };
+    
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError("Trình duyệt này không hỗ trợ truy cập máy ảnh.");
+      setIsInitializing(false);
+      return;
+    }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsInitializing(false);
-      }
-    } catch (err: any) {
-      console.error("Camera access failed:", err);
-      // Retry with simpler constraints
+    const tryStream = async (constraints: MediaStreamConstraints) => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Important: explicitly call play() for some mobile browsers
+          await videoRef.current.play().catch(e => console.warn("Auto-play failed:", e));
           setIsInitializing(false);
+          return true;
         }
-      } catch (retryErr) {
-        setError("Không thể mở máy ảnh. Vui lòng cấp quyền trong cài đặt trình duyệt.");
-        setIsInitializing(false);
+      } catch (err) {
+        console.warn("Stream attempt failed:", constraints, err);
+        return false;
       }
+      return false;
+    };
+
+    // Attempt 1: High-res back camera
+    let success = await tryStream({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+
+    // Attempt 2: Standard-res back camera
+    if (!success) {
+      success = await tryStream({
+        video: {
+          facingMode: 'environment', // strict but standard
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+    }
+
+    // Attempt 3: Any camera
+    if (!success) {
+      success = await tryStream({ video: true });
+    }
+
+    if (!success) {
+      const isIframe = window.self !== window.top;
+      let errMsg = "Không thể khởi động máy ảnh. ";
+      
+      if (isIframe) {
+        errMsg += "Trình xem thử có thể đang chặn quyền truy cập Camera. Vui lòng nhấn nút 'Mở Trong Tab Mới' (icon mũi tên ở góc phải trên) hoặc chọn 'Open in new tab' để sử dụng đầy đủ tính năng.";
+      } else {
+        errMsg += "Vui lòng kiểm tra quyền truy cập Camera trong cài đặt trình duyệt hoặc đổi sang trình duyệt khác (Safari/Chrome).";
+      }
+      
+      setError(errMsg);
+      setIsInitializing(false);
     }
   }, []);
 
@@ -333,11 +368,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           )}
         </div>
         
-        {!(isInitializing || error) && (
+        {!isInitializing && (
           <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-col gap-3">
             <div className="flex justify-between items-center italic">
               <p className="text-[9px] text-ink font-bold leading-tight max-w-[200px]">
-                {showBackPrompt ? 'Vui lòng lật mặt sau và chụp Mã QR để lấy đủ thông tin.' : 'Giữ thẻ phẳng, đủ ánh sáng và tránh bị lóa đèn để AI nhận diện tốt nhất.'}
+                {error ? 'Bạn có thể chọn tải ảnh chụp sẵn từ thư viện nếu không thể mở camera.' : 
+                 showBackPrompt ? 'Vui lòng lật mặt sau và chụp Mã QR để lấy đủ thông tin.' : 
+                 'Giữ thẻ phẳng, đủ ánh sáng và tránh bị lóa đèn để AI nhận diện tốt nhất.'}
               </p>
               <div className="flex gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
