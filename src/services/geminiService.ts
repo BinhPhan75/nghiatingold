@@ -8,20 +8,12 @@ const ai = new GoogleGenAI({
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3-flash-preview",
       contents: [
         {
           parts: [
             {
-              text: "Trích xuất thông tin định danh từ thẻ Căn cước công dân (CCCD) Việt Nam hoặc ứng dụng VNeID. " +
-                    "Các trường cần lấy: " +
-                    "- id: Số CCCD (12 chữ số) " +
-                    "- name: Họ và tên (chữ IN HOA) " +
-                    "- dob: Ngày sinh (DD/MM/YYYY) " +
-                    "- gender: Giới tính " +
-                    "- address: Nơi thường trú/địa chỉ (với VNeID lấy ở dòng dưới cùng dưới ảnh thẻ). " +
-                    "- cardType: 'NEW' (thẻ gắn chip) hoặc 'OLD' (thẻ mã vạch/VNeID). " +
-                    "Kết quả trả về định dạng JSON máy đọc được. CHỈ TRẢ VỀ JSON."
+              text: "Trích xuất thông tin từ thẻ Căn cước Việt Nam hoặc giao diện Căn cước điện tử (VNeID). Lưu ý: Với Căn cước điện tử, số ID và Họ tên nằm trên hình thẻ, nhưng 'Nơi thường trú' (địa chỉ) thường nằm ở danh sách văn bản phía dưới hình thẻ. Hãy đọc toàn bộ hình ảnh để lấy đủ: id (số thẻ), name (họ tên), dob (ngày sinh), gender (giới tính), address (địa chỉ/nơi thường trú), cardType ('OLD' hoặc 'NEW'). Trả về JSON."
             },
             {
               inlineData: {
@@ -42,32 +34,21 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
             dob: { type: Type.STRING },
             gender: { type: Type.STRING },
             address: { type: Type.STRING },
-            cardType: { type: Type.STRING }
-          }
+            cardType: { type: Type.STRING, enum: ["OLD", "NEW", "UNKNOWN"] }
+          },
+          required: ["id", "name", "cardType"]
         }
       }
     });
 
-    console.log("AI Raw Response Text:", response.text);
-    
-    // Robust JSON cleaning
-    let text = response.text || '{}';
-    if (text.includes('```json')) {
-      text = text.split('```json')[1].split('```')[0].trim();
-    } else if (text.includes('```')) {
-      text = text.split('```')[1].split('```')[0].trim();
-    }
-    
-    const result = JSON.parse(text);
-    
-    if (result.id || result.name) {
+    const result = JSON.parse(response.text || '{}');
+    if (result.id && result.name) {
       return {
-        id: result.id || '',
-        name: result.name || '',
+        id: result.id,
+        name: result.name,
         dob: result.dob || '',
         gender: result.gender || '',
-        address: result.address || '',
-        cardType: result.cardType as any
+        address: result.address || ''
       };
     }
     return null;
