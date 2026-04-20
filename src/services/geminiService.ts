@@ -21,23 +21,28 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysi
             {
               text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
 
-PHÂN LOẠI THẺ:
-1. "OLD": Thẻ ghi "CĂN CƯỚC CÔNG DÂN" (Mẫu cũ). Mọi thông tin ở mặt trước.
-2. "NEW": Thẻ ghi "CĂN CƯỚC" (Mẫu mới sau 1/7/2024). Mặt trước chỉ có Tên, Số ID. Mặt sau mới có Địa chỉ.
+PHÂN LOẠI THẺ VÀ QUY TRÌNH:
+1. "OLD": Thẻ ghi "CĂN CƯỚC CÔNG DÂN" (Mẫu cũ). Mọi thông tin cần thiết đều ở mặt trước.
+2. "NEW": Thẻ ghi "CĂN CƯỚC" (Mẫu mới từ 1/7/2024). 
+   - Mặt trước chỉ có Họ tên, Số ID. 
+   - MẶT SAU có MÃ QR chứa ĐẦY ĐỦ THÔNG TIN. Nếu bạn đang nhìn thấy mặt sau của thẻ "NEW", hãy ưu tiên đọc mã QR này.
 3. "ELECTRONIC": Ứng dụng VNeID (ghi "CĂN CƯỚC ĐIỆN TỬ"). Có đầy đủ thông tin trên 1 màn hình.
 
-LƯU Ý QUAN TRỌNG:
-1. BỎ QUA HOÀN TOÀN mã QR và mã vạch.
-2. TRƯỜNG DỮ LIỆU:
+LƯU Ý QUAN TRỌNG KHI ĐỌC MÃ QR:
+Mã QR trên CCCD Việt Nam thường chứa chuỗi dữ liệu phân tách bởi dấu | theo định dạng:
+Số CCCD|Số CMND cũ|Họ tên|Ngày sinh|Giới tính|Địa chỉ thường trú|Ngày cấp.
+=> NẾU CÓ MÃ QR, HÃY ƯU TIÊN TRÍCH XUẤT TỪ ĐÓ VÌ NÓ CHÍNH XÁC 100%.
+
+TRƯỜNG DỮ LIỆU:
    - id: Số định danh (12 chữ số).
    - name: Họ tên (Viết hoa, ví dụ: NGUYỄN VĂN A).
    - dob: Ngày sinh (DD/MM/YYYY).
    - gender: Giới tính (Nam/Nữ).
-   - address: Nơi thường trú.
+   - address: Nơi thường trú (Hoặc "Địa chỉ").
    - cardType: Phân loại ("OLD", "NEW", "ELECTRONIC").
-   - side: Mặt thẻ ("FRONT", "BACK", "ALL"). Nếu là VNeID thì là "ALL".
+   - side: Mặt thẻ ("FRONT", "BACK", "ALL").
 
-3. TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. Nếu không thấy trường nào, hãy để trống "".`
+TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. Nếu không thấy trường nào, hãy để trống "".`
             },
             {
               inlineData: {

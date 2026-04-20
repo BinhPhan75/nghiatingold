@@ -121,16 +121,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   };
 
   const processResult = (result: CCCDAnalysisResult) => {
-    if (showBackPrompt && scannedData) {
-      // If we were waiting for the back, merge it
-      const merged = { ...scannedData, address: result.address || scannedData.address };
-      onScan(merged);
+    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD') {
+      // These cases provide full (or sufficient) info
+      onScan(result);
     } else if (result.cardType === 'NEW' && result.side === 'FRONT') {
-      // New card front - ask for back
+      // New card front - ask for back QR
       setScannedData(result);
       setShowBackPrompt(true);
     } else {
-      // Old card or Electronic - finish immediately
+      // Default fallback
       onScan(result);
     }
   };
@@ -183,7 +182,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-gold-primary animate-pulse" />
             <h3 className="font-black text-[10px] uppercase tracking-[0.2em] m-0">
-              {showBackPrompt ? 'Quét mặt sau Căn cước' : 'Quét thông tin CCCD AI'}
+              {showBackPrompt ? 'Quét Mã QR Mặt Sau' : 'Quét thông tin CCCD AI'}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -218,14 +217,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                </div>
                <h4 className="text-sm font-black uppercase tracking-widest mb-2">Đã nhận diện mặt trước</h4>
                <p className="text-[10px] leading-tight font-medium text-neutral-300 text-center mb-6">
-                 Thông tin ID và Họ tên đã được lấy. Bạn có muốn quét thêm <strong className="text-white">mặt sau</strong> để lấy địa chỉ Nơi thường trú không?
+                 Đây là thẻ Căn cước mẫu mới. Vui lòng lật <strong className="text-white">mặt sau</strong> và hướng camera vào <strong className="text-white">Mã QR</strong> để lấy đầy đủ thông tin địa chỉ và các dữ liệu khác.
                </p>
                <div className="flex flex-col gap-3 w-full">
                  <button 
                   onClick={() => setShowBackPrompt(false)}
                   className="bg-gold-primary text-ink py-3 px-6 font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2"
                  >
-                   Quét mặt sau ngay <ChevronRight size={14} />
+                   Quét Mã QR ngay <ChevronRight size={14} />
                  </button>
                  <button 
                    onClick={handleFinishEarly}
@@ -275,7 +274,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                     <Zap size={24} className="text-ink fill-ink" />
                   </div>
                   <p className="absolute -bottom-6 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-60">
-                    {scannedData ? 'Quét Mặt Sau' : 'Chụp Mặt Trước'}
+                    {scannedData ? 'Quét Mã QR Mặt Sau' : 'Chụp Mặt Trước'}
                   </p>
                 </button>
               </div>
@@ -287,7 +286,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-col gap-3">
             <div className="flex justify-between items-center italic">
               <p className="text-[9px] text-ink font-bold leading-tight max-w-[200px]">
-                {showBackPrompt ? 'Vui lòng lật thẻ và chụp mặt chứa thông tin Nơi thường trú.' : 'Giữ thẻ phẳng, đủ ánh sáng và tránh bị lóa đèn để AI nhận diện tốt nhất.'}
+                {showBackPrompt ? 'Vui lòng lật mặt sau và chụp Mã QR để lấy đủ thông tin.' : 'Giữ thẻ phẳng, đủ ánh sáng và tránh bị lóa đèn để AI nhận diện tốt nhất.'}
               </p>
               <div className="flex gap-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
@@ -307,7 +306,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                    <p className="text-[10px] font-bold text-ink truncate">{scannedData.name}</p>
                  </div>
                  <div className="flex items-center gap-1 text-[8px] font-black text-green-600">
-                    <CheckCircle2 size={12} /> ĐÃ LẤY ID & TÊN
+                    <CheckCircle2 size={12} /> CẦN QUÉT QR MẶT SAU
                  </div>
               </div>
             )}
