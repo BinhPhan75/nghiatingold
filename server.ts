@@ -4,7 +4,6 @@ import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,66 +14,6 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
-
-  // API Route to analyze CCCD using Gemini
-  app.post('/api/analyze-cccd', async (req, res) => {
-    try {
-      const { image } = req.body;
-      if (!image) {
-        return res.status(400).json({ error: 'Image is required' });
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.error('GEMINI_API_KEY is not set on the server');
-        return res.status(500).json({ error: 'AI Service configuration error' });
-      }
-
-      const genAI = new (GoogleGenAI as any)({ apiKey });
-      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-
-      const prompt = `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp MẶT TRƯỚC thẻ Căn cước công dân (CCCD) Việt Nam.
-LƯU Ý QUAN TRỌNG:
-1. BỎ QUA HOÀN TOÀN mã QR và mã vạch. Chỉ đọc thông tin bằng chữ và số in trên mặt thẻ.
-2. TRƯỜNG DỮ LIỆU:
-   - id: Số thẻ (12 chữ số).
-   - name: Họ tên (Viết hoa toàn bộ, ví dụ: NGUYỄN VĂN A).
-   - dob: Ngày tháng năm sinh (Định dạng: DD/MM/YYYY).
-   - gender: Giới tính (Nam hoặc Nữ).
-   - address: Nơi thường trú (Đầy đủ địa chỉ ghi trên thẻ).
-3. TRẢ VỀ JSON: Chỉ trả về JSON duy nhất, không giải thích thêm. Nếu không thấy trường nào, hãy để trống "".`;
-
-      const result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            data: image.split(',')[1] || image,
-            mimeType: 'image/jpeg'
-          }
-        }
-      ]);
-
-      const response = await result.response;
-      const responseText = response.text();
-      let jsonStr = responseText;
-      
-      if (responseText.includes('```')) {
-        const match = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/```\n([\s\S]*?)\n```/);
-        if (match) jsonStr = match[1];
-      }
-
-      try {
-        const data = JSON.parse(jsonStr.trim());
-        res.json(data);
-      } catch (parseError) {
-        console.error('Failed to parse AI JSON:', responseText);
-        res.status(500).json({ error: 'Failed to parse AI response' });
-      }
-    } catch (error: any) {
-      console.error('AI Analysis Error:', error);
-      res.status(500).json({ error: error.message || 'Internal server error during analysis' });
-    }
-  });
 
   // API Route to fetch SJC prices
   app.get('/api/gold-prices/sjc', async (req, res) => {
