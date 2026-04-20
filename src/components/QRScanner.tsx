@@ -118,60 +118,83 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     }
   }, []);
 
+  const isScanningActive = useRef(true);
+  const lastScanTime = useRef(0);
+
   const scanQRCode = useCallback(() => {
-    if (!videoRef.current || isProcessing || isInitializing) {
+    if (!isScanningActive.current) return;
+
+    if (!videoRef.current || isProcessing || isInitializing || showBackPrompt) {
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
 
-    const video = videoRef.current;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      if (!scanCanvasRef.current) {
-        scanCanvasRef.current = document.createElement('canvas');
-      }
-      
-      const canvas = scanCanvasRef.current;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      
-      if (context && video.videoWidth > 0 && video.videoHeight > 0) {
-        canvas.width = video.videoWidth / 2;
-        canvas.height = video.videoHeight / 2;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // Handle CJS/ESM jsQR import safely
-        const jsqrFunc = (jsQR as any).default || jsQR;
-        if (typeof jsqrFunc === 'function') {
-          const code = jsqrFunc(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
-          });
+    const now = Date.now();
+    // Throttle: Scan every 250ms (4 times a second) to save CPU/Prevent UI lock
+    if (now - lastScanTime.current < 250) {
+      requestRef.current = requestAnimationFrame(scanQRCode);
+      return;
+    }
+    lastScanTime.current = now;
 
-          if (code) {
-            setIsQRDetected(true);
-            const parsed = parseCCCD(code.data);
-            if (parsed) {
-              const result: CCCDAnalysisResult = {
-                ...parsed,
-                cardType: 'NEW',
-                side: 'ALL'
-              };
-              processResultRef.current(result);
-              return; // Stop loop on success
+    try {
+      const video = videoRef.current;
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
+        if (!scanCanvasRef.current) {
+          scanCanvasRef.current = document.createElement('canvas');
+        }
+        
+        const canvas = scanCanvasRef.current;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        
+        if (context) {
+          // Downscale for performance
+          const scale = 0.5;
+          canvas.width = video.videoWidth * scale;
+          canvas.height = video.videoHeight * scale;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Handle CJS/ESM jsQR import safely
+          const jsqrFunc = (jsQR as any).default || jsQR;
+          if (typeof jsqrFunc === 'function') {
+            const code = jsqrFunc(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert",
+            });
+
+            if (code && code.data) {
+              setIsQRDetected(true);
+              const parsed = parseCCCD(code.data);
+              if (parsed && parsed.id) {
+                const result: CCCDAnalysisResult = {
+                  ...parsed,
+                  cardType: 'NEW',
+                  side: 'ALL'
+                };
+                isScanningActive.current = false; // Stop further scans
+                processResultRef.current(result);
+                return; 
+              }
+            } else {
+              setIsQRDetected(false);
             }
-          } else {
-            setIsQRDetected(false);
           }
         }
       }
+    } catch (err) {
+      console.error("QR Scan Loop Error:", err);
     }
+    
     requestRef.current = requestAnimationFrame(scanQRCode);
-  }, [isProcessing, isInitializing]);
+  }, [isProcessing, isInitializing, showBackPrompt]);
 
   useEffect(() => {
+    isScanningActive.current = true;
     startCamera();
     requestRef.current = requestAnimationFrame(scanQRCode);
     return () => {
+      isScanningActive.current = false;
       cancelAnimationFrame(requestRef.current);
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
