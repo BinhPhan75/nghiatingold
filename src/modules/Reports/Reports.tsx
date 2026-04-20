@@ -6,13 +6,18 @@ import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 
+type GroupedTransaction = Transaction & { 
+  salesperson?: Profile; 
+  items: Transaction[] 
+};
+
 const Reports: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-  const [transactions, setTransactions] = useState<(Transaction & { salesperson?: Profile })[]>([]);
+  const [transactions, setTransactions] = useState<GroupedTransaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTransaction, setSelectedTransaction] = useState<(Transaction & { salesperson?: Profile }) | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<GroupedTransaction | null>(null);
   const [lastError, setLastError] = useState<any>(null);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean; message: string }>({ 
     connected: true, message: '' 
@@ -43,16 +48,17 @@ const Reports: React.FC = () => {
     if (data) setBanks(data);
   };
 
-  const handleDeleteTransaction = async (id: string) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa giao dịch này? Hành động này không thể hoàn tác.")) {
+  const handleDeleteTransaction = async (group: GroupedTransaction) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa toàn bộ giao dịch này (${group.items.length} mặt hàng)? Hành động này không thể hoàn tác.`)) {
       return;
     }
 
     try {
+      const idsToDelete = group.items.map(i => i.id);
       const { error } = await supabase
         .from('transactions')
         .delete()
-        .eq('id', id);
+        .in('id', idsToDelete);
 
       if (error) throw error;
       
@@ -104,7 +110,36 @@ const Reports: React.FC = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setTransactions(data || []);
+      
+      const rawData = data || [];
+      
+      // Grouping logic: Transactions with the same customer within 1 minute of each other
+      const grouped: GroupedTransaction[] = [];
+      const sorted = [...rawData].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      sorted.forEach(t => {
+        const tDate = new Date(t.created_at);
+        const existingGroup = grouped.find(g => 
+          g.customer_cccd === t.customer_cccd && 
+          g.type === t.type &&
+          Math.abs(new Date(g.created_at).getTime() - tDate.getTime()) < 60000 // 1 minute
+        );
+        
+        if (existingGroup) {
+          existingGroup.items.push(t);
+          existingGroup.total_amount += t.total_amount;
+          existingGroup.tien_mat += (t.tien_mat || 0);
+          existingGroup.chuyen_khoan += (t.chuyen_khoan || 0);
+          existingGroup.chiet_khau += (t.chiet_khau || 0);
+        } else {
+          grouped.push({
+            ...t,
+            items: [t]
+          });
+        }
+      });
+
+      setTransactions(grouped);
       setLastError(null);
     } catch (err: any) {
       console.error("Fetch Transactions Error:", err);
@@ -147,21 +182,23 @@ const Reports: React.FC = () => {
       "Nhân viên"
     ];
 
-    const rows = transactions.map(t => [
-      new Date(t.created_at).toLocaleString('vi-VN'),
-      t.type === 'BUY' ? "MUA VÀO" : "BÁN RA",
-      t.customer_name,
-      `'${t.customer_cccd}`, // Prefix with ' to avoid Excel numeric formatting
-      t.dia_chi || "",
-      t.product_name,
-      t.quantity,
-      t.unit,
-      t.price_per_unit,
-      t.total_amount,
-      t.tien_mat || 0,
-      t.chuyen_khoan || 0,
-      t.salesperson?.full_name || "Hệ thống"
-    ]);
+    const rows = transactions.flatMap(group => {
+      return group.items.map(t => [
+        new Date(t.created_at).toLocaleString('vi-VN'),
+        t.type === 'BUY' ? "MUA VÀO" : "BÁN RA",
+        t.customer_name,
+        `'${t.customer_cccd}`, 
+        t.dia_chi || "",
+        t.product_name,
+        t.quantity,
+        t.unit,
+        t.price_per_unit,
+        t.total_amount,
+        t.tien_mat || 0,
+        t.chuyen_khoan || 0,
+        group.salesperson?.full_name || "Hệ thống"
+      ]);
+    });
 
     const csvContent = [
       headers.join(","),
@@ -345,9 +382,17 @@ const Reports: React.FC = () => {
                       )}
                     </td>
                     <td className="p-4">
-                      <div className="font-bold italic text-ink text-sm">{t.product_name}</div>
-                      <div className="text-[9px] text-neutral-400 flex items-center gap-1">
-                        SL: <span className="font-bold text-ink">{t.quantity} {t.unit}</span>
+                      <div className="flex flex-col gap-1">
+                        {t.items.slice(0, 2).map((item, idx) => (
+                          <div key={item.id} className="font-bold italic text-ink text-sm">
+                            {item.product_name} <span className="text-[10px] text-neutral-400 font-normal">x{item.quantity}</span>
+                          </div>
+                        ))}
+                        {t.items.length > 2 && (
+                          <div className="text-[9px] text-gold-dark font-black uppercase">
+                            + {t.items.length - 2} mặt hàng khác...
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">
@@ -441,35 +486,39 @@ const Reports: React.FC = () => {
                   {/* Right Column: Order Details & Payment */}
                   <div className="flex flex-col gap-8">
                     <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Thông tin mặt hàng</h4>
-                      <div className="bg-neutral-50 p-4 rounded-sm border border-neutral-100">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <p className="text-lg font-black text-ink italic">{selectedTransaction.product_name}</p>
-                            <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">
-                              {selectedTransaction.quantity} {selectedTransaction.unit}
-                            </p>
-                          </div>
-                          <p className="text-sm font-mono font-bold text-neutral-400">
-                            ID: {selectedTransaction.id.slice(0, 8)}
-                          </p>
-                        </div>
-                        <div className="space-y-2 pt-4 border-t border-neutral-200/50">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-neutral-500">Đơn giá:</span>
-                            <span className="font-bold">{formatCurrency(selectedTransaction.price_per_unit)}</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-neutral-500">Thành tiền:</span>
-                            <span className="font-bold">{formatCurrency(selectedTransaction.price_per_unit * selectedTransaction.quantity)}</span>
-                          </div>
-                          {selectedTransaction.chiet_khau > 0 && (
-                            <div className="flex justify-between text-xs text-red-500 italic">
-                              <span>Chiết khấu (-):</span>
-                              <span className="font-bold">-{formatCurrency(selectedTransaction.chiet_khau)}</span>
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-100 pb-2">Danh sách mặt hàng ({selectedTransaction.items.length})</h4>
+                      <div className="flex flex-col gap-3">
+                        {selectedTransaction.items.map((item, idx) => (
+                          <div key={item.id} className="bg-neutral-50 p-4 rounded-sm border border-neutral-100">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <p className="text-lg font-black text-ink italic">{item.product_name}</p>
+                                <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">
+                                  {item.quantity} {item.unit}
+                                </p>
+                              </div>
+                              <p className="text-sm font-mono font-bold text-neutral-400">
+                                #{idx + 1}
+                              </p>
                             </div>
-                          )}
-                        </div>
+                            <div className="space-y-2 pt-4 border-t border-neutral-200/50">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-neutral-500">Đơn giá:</span>
+                                <span className="font-bold">{formatCurrency(item.price_per_unit)}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-neutral-500">Thành tiền:</span>
+                                <span className="font-bold">{formatCurrency(item.price_per_unit * item.quantity)}</span>
+                              </div>
+                              {item.chiet_khau > 0 && (
+                                <div className="flex justify-between text-xs text-red-500 italic">
+                                  <span>Chiết khấu phân bổ (-):</span>
+                                  <span className="font-bold">-{formatCurrency(item.chiet_khau)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -505,10 +554,11 @@ const Reports: React.FC = () => {
               <div className="bg-neutral-50 p-6 border-t border-neutral-100 flex justify-end gap-4">
                 {isAdmin && (
                   <button 
-                    onClick={() => handleDeleteTransaction(selectedTransaction.id)}
+                    onClick={() => handleDeleteTransaction(selectedTransaction)}
                     className="px-6 py-2 border border-red-200 text-red-500 text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
                   >
-                    <Trash2 size={14} /> Xóa giao dịch
+                    <Trash2 size={14} /> <span className="hidden sm:inline">Xóa toàn bộ giao dịch</span>
+                    <span className="sm:hidden">Xóa tất cả</span>
                   </button>
                 )}
                 <button 
