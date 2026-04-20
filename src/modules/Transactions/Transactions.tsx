@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle } from 'lucide-react';
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -24,6 +24,16 @@ const Transactions: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerBankId, setCustomerBankId] = useState('');
   const [customerAccountNo, setCustomerAccountNo] = useState('');
+  
+  // Cart State
+  interface CartItem {
+    id: string;
+    product: Product;
+    quantity: number;
+    pricePerUnit: number;
+  }
+  const [cart, setCart] = useState<CartItem[]>([]);
+  
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
@@ -120,13 +130,36 @@ const Transactions: React.FC = () => {
   }, [selectedProduct, type]);
 
   const currentPrice = customPrice;
-  const subtotal = currentPrice * quantity;
-  const totalAmount = Math.max(0, subtotal - discount);
+  
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
+  const totalAmount = Math.max(0, cartSubtotal - discount);
 
   useEffect(() => {
-    // Default: transferAmount = totalAmount, cashAmount = 0
-    setTransferAmount(totalAmount - cashAmount);
-  }, [totalAmount]);
+    // Default: transferAmount = totalAmount - cashAmount
+    setTransferAmount(Math.max(0, totalAmount - cashAmount));
+  }, [totalAmount, cashAmount]);
+
+  const addToCart = () => {
+    if (!selectedProduct || quantity <= 0 || customPrice <= 0) {
+      alert("Vui lòng chọn loại vàng, số lượng và đơn giá hợp lệ");
+      return;
+    }
+    const newItem: CartItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      product: selectedProduct,
+      quantity,
+      pricePerUnit: customPrice
+    };
+    setCart([...cart, newItem]);
+    // Reset item selection for next one
+    setSelectedProduct(null);
+    setQuantity(1);
+    setCustomPrice(0);
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
 
   const handleCashChange = (val: number) => {
     setCashAmount(val);
@@ -180,39 +213,70 @@ const Transactions: React.FC = () => {
       return;
     }
 
-    if (!selectedProduct || !customerName || !customerCCCD) {
-      alert("Vui lòng nhập đầy đủ thông tin");
+    if (cart.length === 0) {
+      alert("Vui lòng thêm ít nhất một mặt hàng vào danh sách");
+      return;
+    }
+
+    if (!customerName || !customerCCCD) {
+      alert("Vui lòng nhập đầy đủ thông tin khách hàng");
       return;
     }
 
     setSubmitting(true);
-    const transaction: Omit<Transaction, 'id'> = {
-      type,
-      customer_name: customerName,
-      customer_cccd: customerCCCD,
-      dia_chi: customerAddress,
-      customer_bank_id: type === 'BUY' ? customerBankId : undefined,
-      customer_account_no: type === 'BUY' ? customerAccountNo : undefined,
-      product_id: selectedProduct.id,
-      product_name: selectedProduct.name,
-      quantity,
-      unit: selectedProduct.unit,
-      price_per_unit: currentPrice,
-      total_amount: totalAmount,
-      chiet_khau: discount,
-      tien_mat: cashAmount,
-      chuyen_khoan: transferAmount,
-      created_at: new Date().toISOString(),
-      created_by: profile?.id || 'anonymous',
-    };
+    
+    // Distribute payment proportionally with rounding adjustment for last item
+    let distributedDiscount = 0;
+    let distributedCash = 0;
+    let distributedTransfer = 0;
+
+    const itemsCount = cart.length;
+    const transactions: Omit<Transaction, 'id'>[] = cart.map((item, index) => {
+      const isLast = index === itemsCount - 1;
+      const itemSubtotal = item.pricePerUnit * item.quantity;
+      const weight = itemSubtotal / cartSubtotal;
+      
+      // Proportional distribution
+      let itemDiscount = isLast ? (discount - distributedDiscount) : Math.round(discount * weight);
+      let itemCash = isLast ? (cashAmount - distributedCash) : Math.round(cashAmount * weight);
+      let itemTransfer = isLast ? (transferAmount - distributedTransfer) : Math.round(transferAmount * weight);
+
+      distributedDiscount += itemDiscount;
+      distributedCash += itemCash;
+      distributedTransfer += itemTransfer;
+
+      const itemTotal = itemSubtotal - itemDiscount;
+      
+      return {
+        type,
+        customer_name: customerName,
+        customer_cccd: customerCCCD,
+        dia_chi: customerAddress,
+        customer_bank_id: type === 'BUY' ? customerBankId : undefined,
+        customer_account_no: type === 'BUY' ? customerAccountNo : undefined,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity,
+        unit: item.product.unit,
+        price_per_unit: item.pricePerUnit,
+        total_amount: itemTotal,
+        chiet_khau: itemDiscount,
+        tien_mat: itemCash,
+        chuyen_khoan: itemTransfer,
+        created_at: new Date().toISOString(),
+        created_by: profile?.id || 'anonymous',
+      };
+    });
 
     setLastError(null);
     try {
-      const { error } = await supabase.from('transactions').insert([transaction]);
+      const { error } = await supabase.from('transactions').insert(transactions);
       if (error) throw error;
       
+      const itemsSummary = cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ');
+      
       if (type === 'SELL') {
-        const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct.name} x ${quantity} ${selectedProduct.unit}`);
+        const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${itemsSummary}`);
         if (config && config.bank_id && config.account_no && config.account_holder) {
           const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount || totalAmount, desc);
           setQrUrl(url);
@@ -222,11 +286,11 @@ const Transactions: React.FC = () => {
           setSubmitting(false);
         }
       } else {
-        // For BUY transactions, generate QR for the SHOP to pay CUSTOMER
+        // For BUY transactions
         if (transferAmount > 0 && customerBankId && customerAccountNo) {
           const bank = banks.find(b => b.id === customerBankId);
           if (bank) {
-            const desc = removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct.unit} ${selectedProduct.name} ${customerName} ${customerCCCD}`);
+            const desc = removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${itemsSummary} ${customerName} ${customerCCCD}`);
             const url = getVietQRUrl(bank.bin, customerAccountNo, customerName, transferAmount, desc);
             setQrUrl(url);
             setShowQR(true);
@@ -248,6 +312,7 @@ const Transactions: React.FC = () => {
     setCustomerName('');
     setCustomerCCCD('');
     setCustomerAddress('');
+    setCart([]);
     setQuantity(1);
     setDiscount(0);
     setCashAmount(0);
@@ -391,49 +456,91 @@ const Transactions: React.FC = () => {
             </div>
           )}
 
-          <div className="input-field">
-            <label>Mặt hàng gold</label>
-            <select 
-              className="w-full"
-              value={selectedProduct?.id || ''} 
-              onChange={(e) => {
-                const p = products.find(x => x.id === e.target.value);
-                setSelectedProduct(p || null);
-              }}
-            >
-              <option value="">-- Chọn loại vàng --</option>
-              {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
-              ))}
-            </select>
+          <div className="bg-paper border border-neutral-100 p-4 rounded-sm">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 border-b border-neutral-50 pb-2">Danh sách mặt hàng ({cart.length})</h4>
+            <div className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-2">
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-neutral-300 italic text-[10px] font-black uppercase tracking-widest">Chưa có sản phẩm nào được thêm</div>
+              ) : (
+                cart.map(item => (
+                  <div key={item.id} className="flex justify-between items-center group bg-neutral-50 p-3 border-l-2 border-gold-primary">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-ink">{item.product.name}</span>
+                      <span className="text-[10px] text-neutral-500">{item.quantity} {item.product.unit} x {formatCurrency(item.pricePerUnit)}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-black text-ink">{formatCurrency(item.pricePerUnit * item.quantity)}</span>
+                      <button 
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-neutral-300 hover:text-red-500 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="p-5 border-2 border-gold-primary/20 bg-gold-primary/5 rounded-sm relative">
+            <div className="absolute -top-3 left-4 bg-gold-primary text-ink px-3 py-1 font-black text-[9px] uppercase tracking-widest">Thêm sản phẩm mới</div>
+            <div className="flex flex-col gap-4">
+              <div className="input-field">
+                <label>Mặt hàng gold</label>
+                <select 
+                  className="w-full"
+                  value={selectedProduct?.id || ''} 
+                  onChange={(e) => {
+                    const p = products.find(x => x.id === e.target.value);
+                    setSelectedProduct(p || null);
+                  }}
+                >
+                  <option value="">-- Chọn loại vàng --</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="input-field">
+                  <label>Số lượng ({selectedProduct?.unit || 'đơn vị'})</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={quantity} 
+                    onChange={(e) => setQuantity(Number(e.target.value))} 
+                  />
+                </div>
+                <div className="input-field">
+                  <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
+                  <input 
+                    type="text"
+                    value={formatNumberWithSeparator(customPrice)}
+                    className="font-mono font-bold text-lg bg-neutral-50 focus:bg-white"
+                    onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={addToCart}
+                className="bg-ink text-paper py-3 font-black uppercase text-[10px] tracking-widest hover:bg-gold-dark transition-all flex items-center justify-center gap-2"
+              >
+                <UserPlus size={14} /> Thêm vào danh sách
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="input-field">
-              <label>Số lượng ({selectedProduct?.unit || 'đơn vị'})</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                value={quantity} 
-                onChange={(e) => setQuantity(Number(e.target.value))} 
-              />
-            </div>
-            <div className="input-field">
-              <label>Chiết khấu (VND)</label>
+              <label>Chiết khấu tổng (VND)</label>
               <input 
                 type="text"
                 value={formatNumberWithSeparator(discount)}
                 className="font-mono font-bold text-neutral-600"
                 onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
-              />
-            </div>
-            <div className="input-field">
-              <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
-              <input 
-                type="text"
-                value={formatNumberWithSeparator(customPrice)}
-                className="font-mono font-bold text-lg bg-neutral-50 focus:bg-white"
-                onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
               />
             </div>
           </div>
@@ -463,8 +570,8 @@ const Transactions: React.FC = () => {
         <div className="mt-4 pt-6 border-t border-neutral-100">
           <div className="flex flex-col gap-2 mb-6">
             <div className="flex justify-between items-center text-neutral-400">
-              <span className="text-[10px] uppercase font-black">Thành tiền</span>
-              <span className="text-lg font-bold">{formatCurrency(subtotal)}</span>
+              <span className="text-[10px] uppercase font-black">Tạm tính ({cart.length} mặt hàng)</span>
+              <span className="text-lg font-bold">{formatCurrency(cartSubtotal)}</span>
             </div>
             {discount > 0 && (
               <div className="flex justify-between items-center text-red-400 italic">
@@ -520,15 +627,15 @@ const Transactions: React.FC = () => {
                 <div className="flex justify-between items-center gap-4">
                   <span className="font-mono font-bold text-sm text-ink break-all">
                     {type === 'SELL' 
-                      ? removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)
-                      : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct?.unit} ${selectedProduct?.name} ${customerName} ${customerCCCD}`)
+                      ? removeVietnameseTones(`${customerName} ${customerCCCD} ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')}`)
+                      : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')} ${customerName} ${customerCCCD}`)
                     }
                   </span>
                   <button 
                     onClick={() => {
                       const desc = type === 'SELL' 
-                        ? removeVietnameseTones(`${customerName} ${customerCCCD} ${selectedProduct?.name} x ${quantity} ${selectedProduct?.unit}`)
-                        : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${quantity} ${selectedProduct?.unit} ${selectedProduct?.name} ${customerName} ${customerCCCD}`);
+                        ? removeVietnameseTones(`${customerName} ${customerCCCD} ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')}`)
+                        : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')} ${customerName} ${customerCCCD}`);
                       navigator.clipboard.writeText(desc);
                       alert("Đã sao chép nội dung!");
                     }}
