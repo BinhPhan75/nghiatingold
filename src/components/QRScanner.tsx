@@ -24,15 +24,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 15, 
-          qrbox: { width: 280, height: 280 },
-          aspectRatio: 1.0
+          fps: 20, 
+          qrbox: { width: 320, height: 200 }, // Card shaped box
+          aspectRatio: 1.586 // CCCD standard aspect ratio
         };
 
         await html5QrCode.start(
           { facingMode: "environment" }, 
           config, 
           (decodedText) => {
+            // Even if it scans a QR, we accept it, but we don't focus on it in the UI
             onScan(decodedText);
           },
           (errorMessage) => { }
@@ -145,7 +146,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           </button>
         </div>
         
-        <div className="relative aspect-square bg-black overflow-hidden shadow-inner">
+        <div className="relative aspect-[1.586/1] bg-black overflow-hidden shadow-inner border-y border-gold-primary/20">
           <div id="reader" className="w-full h-full"></div>
           
           {(isInitializing || isScanningFile || isProcessing) && (
@@ -174,10 +175,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           {!isInitializing && !error && (
             <>
               <div className="absolute inset-0 pointer-events-none opacity-50 z-0">
-                <div className="absolute top-8 left-8 w-12 h-12 border-t-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute top-8 right-8 w-12 h-12 border-t-4 border-r-4 border-gold-primary"></div>
-                <div className="absolute bottom-16 left-8 w-12 h-12 border-b-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute bottom-16 right-8 w-12 h-12 border-b-4 border-r-4 border-gold-primary"></div>
+                <div className="absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 border-gold-primary"></div>
+                <div className="absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 border-gold-primary"></div>
+                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 border-gold-primary"></div>
+                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 border-gold-primary"></div>
                 <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gold-primary/30 animate-pulse"></div>
               </div>
               
@@ -200,7 +201,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         {!(isInitializing || error) && (
           <div className="p-4 bg-neutral-50 border-t border-neutral-100 italic flex justify-between items-center px-6">
             <p className="text-[10px] text-ink font-medium leading-relaxed max-w-[180px]">
-              Đưa CCCD vào khung hình rồi nhấn nút chụp để AI phân tích.
+              Đặt mặt trước thẻ CCCD vào khung hình và nhấn nút để quét thông tin tự động bằng AI.
             </p>
             <div className="flex gap-2">
               <input 

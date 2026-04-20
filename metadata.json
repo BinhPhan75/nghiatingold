@@ -1,6 +1,6 @@
 {
-  "name": "Hệ Thống Quản Lý Vàng Bạc - NGHIATIN GOLD",
-  "description": "Giải pháp quản lý mua bán vàng bạc tích hợp quét CCCD AI, báo cáo doanh thu đa chiều và thanh toán Vietcombank thông minh.",
+  "name": "CCCD AI Scanner - Nghĩa Tín",
+  "description": "Ứng dụng quét thẻ CCCD mặt trước bằng camera điện thoại, sử dụng AI để trích xuất thông tin tự động, không phụ thuộc vào mã QR.",
   "requestFramePermissions": [
     "camera"
   ]
