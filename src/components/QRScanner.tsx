@@ -48,12 +48,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
   }, [onScan]);
 
   const startCamera = useCallback(async () => {
+    // Basic cleanup before starting
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      if (stream.active) {
-        setIsInitializing(false);
-        return;
-      }
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
     }
 
     setIsInitializing(true);
@@ -65,11 +64,21 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       return;
     }
 
+    // Small delay to ensure hardware is released
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const tryStream = async (constraints: MediaStreamConstraints) => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Wait for metadata to be loaded for better stability on iOS
+          await new Promise((resolve) => {
+             if (!videoRef.current) return resolve(null);
+             videoRef.current.onloadedmetadata = () => resolve(null);
+             // Timeout fallback
+             setTimeout(resolve, 1000);
+          });
           await videoRef.current.play().catch(e => console.warn("Auto-play failed:", e));
           setIsInitializing(false);
           return true;
@@ -81,39 +90,35 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       return false;
     };
 
-    // Attempt 1: High-res back camera
+    // Attempt 1: Back camera with ideal resolution
     let success = await tryStream({
       video: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       }
     });
 
-    // Attempt 2: Standard-res back camera
+    // Attempt 2: Basic back camera
     if (!success) {
       success = await tryStream({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
+        video: { facingMode: 'environment' }
       });
     }
 
-    // Attempt 3: Any camera
+    // Attempt 3: Any camera at all
     if (!success) {
       success = await tryStream({ video: true });
     }
 
     if (!success) {
       const isIframe = window.self !== window.top;
-      let errMsg = "Không thể khởi động máy ảnh. ";
+      let errMsg = "Không thể kết nối máy ảnh. ";
       
       if (isIframe) {
-        errMsg += "Trình xem thử có thể đang chặn quyền truy cập Camera. Vui lòng nhấn nút 'Mở Trong Tab Mới' (icon mũi tên ở góc phải trên) hoặc chọn 'Open in new tab' để sử dụng đầy đủ tính năng.";
+        errMsg += "Vui lòng mở trong tab mới để cấp quyền.";
       } else {
-        errMsg += "Vui lòng kiểm tra quyền truy cập Camera trong cài đặt trình duyệt hoặc đổi sang trình duyệt khác (Safari/Chrome).";
+        errMsg += "Vui lòng kiểm tra quyền truy cập camera.";
       }
       
       setError(errMsg);
@@ -154,12 +159,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
           if (code && code.data) {
             setIsQRDetected(true);
             if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
-            detectionTimeout.current = setTimeout(() => setIsQRDetected(false), 2000); // Hold for 2s
+            detectionTimeout.current = setTimeout(() => setIsQRDetected(false), 3000); // Stable hold for 3s
 
             const parsed = parseCCCD(code.data);
             if (parsed && parsed.id) {
               isScanningActive.current = false;
-              setTimeout(() => onScan(code.data), 500);
+              // Visual confirmation delay
+              setTimeout(() => onScan(code.data), 800);
               return;
             }
           }
@@ -350,7 +356,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
                 
                 {isQRDetected && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full animate-pulse border border-green-500/50">
+                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full border border-green-500/50 scale-110 transition-transform duration-500">
                       <QrCode className="text-green-500" size={48} />
                     </div>
                   </div>
@@ -371,8 +377,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
                   disabled={isProcessing}
                   className="group relative flex items-center justify-center"
                 >
-                  <div className={`absolute inset-0 ${mode === 'qr' ? 'bg-blue-400/20' : 'bg-gold-primary/20'} rounded-full scale-125 blur-md animate-pulse`}></div>
-                  <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-blue-600' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-transform`}>
+                  <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-blue-600' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-all`}>
                     <Camera size={28} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
                   </div>
                   <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-80 bg-ink/50 px-2 py-0.5 rounded shadow-sm">
