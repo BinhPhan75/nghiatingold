@@ -25,8 +25,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 15, 
-          qrbox: { width: 280, height: 280 },
+          fps: 25, 
+          qrbox: { width: 300, height: 300 },
           aspectRatio: 1.0
         };
 
