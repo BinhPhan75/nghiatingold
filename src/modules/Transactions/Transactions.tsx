@@ -196,22 +196,27 @@ const Transactions: React.FC = () => {
     // Case 1: Data is an object from AI analysis (from Photo upload or Live AI Capture)
     if (typeof data === 'object' && (data.id || data.name)) {
       console.log("AI result detected:", data);
-      if (data.name) setCustomerName(data.name);
-      if (data.id) setCustomerCCCD(data.id);
       
-      if (data.address) {
-        setCustomerAddress(data.address);
+      // Update fields if they exist and are not just empty placeholder strings
+      if (data.name && data.name.trim().length > 0) setCustomerName(data.name.trim());
+      if (data.id && data.id.trim().length > 0) setCustomerCCCD(data.id.trim());
+      
+      if (data.address && data.address.trim().length > 10) {
+        setCustomerAddress(data.address.trim());
         setIsWaitingForBackScan(false);
         setShowBackScanPrompt(false);
         setShowScanner(false);
-      } else if (data.cardType === 'NEW' || !data.address) {
-        // If it's a NEW card or it's just missing address, prompt for back scan
-        setIsWaitingForBackScan(true);
-        setShowBackScanPrompt(true);
       } else {
-        setIsWaitingForBackScan(false);
-        setShowBackScanPrompt(false);
-        setShowScanner(false);
+        // Missing or incomplete address, prompt for back scan
+        if (data.cardType === 'NEW' || data.id) {
+          setIsWaitingForBackScan(true);
+          setShowBackScanPrompt(true);
+        } else {
+          // If totally unhelpful, keep scanner open but maybe don't prompt? 
+          // For now, always prompt if we got some info but no address.
+          setIsWaitingForBackScan(true);
+          setShowBackScanPrompt(true);
+        }
       }
 
       setLastError(null);

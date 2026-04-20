@@ -8,12 +8,22 @@ const ai = new GoogleGenAI({
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3-flash-preview",
       contents: [
         {
           parts: [
             {
-              text: "Bạn là chuyên gia bốc tách dữ liệu từ Căn cước Việt Nam. Hãy đọc hình ảnh (thẻ vật lý hoặc app VNeID) để trích xuất: id (số CCCD), name (Họ tên), dob (Ngày sinh), gender (Giới tính), address (Địa chỉ/Nơi thường trú), cardType ('OLD' hoặc 'NEW'). Đối với VNeID, địa chỉ nằm ở danh mục văn bản phía dưới hình thẻ. Trả về JSON."
+              text: "Bạn là hệ thống nhận diện Căn cước Công dân / Thẻ Căn cước Việt Nam. Hãy bốc tách dữ liệu từ ảnh (thẻ vật lý hoặc app VNeID). \n\n" +
+                    "Yêu cầu TRẢ VỀ JSON theo schema sau:\n" +
+                    "{\n" +
+                    "  \"id\": \"Số định danh 12 chữ số\",\n" +
+                    "  \"name\": \"Họ và tên\",\n" +
+                    "  \"dob\": \"Ngày sinh (DD/MM/YYYY)\",\n" +
+                    "  \"gender\": \"Giới tính (Nam/Nữ)\",\n" +
+                    "  \"address\": \"Địa chỉ thường trú (BẮT BUỘC nếu là mặt sau hoặc app VNeID)\",\n" +
+                    "  \"cardType\": \"'NEW' nếu là mẫu 2024 hoặc VNeID, 'OLD' nếu là mẫu cũ\"\n" +
+                    "}\n\n" +
+                    "Lưu ý: Đối với VNeID, địa chỉ nằm ở danh mục văn bản phí dưới hình thẻ ảo. Nếu không thấy địa chỉ, hãy để trống trường address. CHỈ TRẢ VỀ JSON."
             },
             {
               inlineData: {
@@ -40,8 +50,17 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
       }
     });
 
-    console.log("AI Raw Content:", response.text);
-    const result = JSON.parse(response.text || '{}');
+    console.log("AI Raw Response Text:", response.text);
+    
+    // Robust JSON cleaning
+    let text = response.text || '{}';
+    if (text.includes('```json')) {
+      text = text.split('```json')[1].split('```')[0].trim();
+    } else if (text.includes('```')) {
+      text = text.split('```')[1].split('```')[0].trim();
+    }
+    
+    const result = JSON.parse(text);
     
     if (result.id || result.name) {
       return {
