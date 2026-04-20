@@ -45,6 +45,7 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isWaitingForBackScan, setIsWaitingForBackScan] = useState(false);
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -69,7 +70,10 @@ const Transactions: React.FC = () => {
           if (info) {
             setCustomerName(info.name);
             setCustomerCCCD(info.id);
-            if (info.address) setCustomerAddress(info.address);
+            if (info.address) {
+              setCustomerAddress(info.address);
+              setIsWaitingForBackScan(false);
+            }
             
             // Success Feedback
             const notification = document.createElement('div');
@@ -78,14 +82,15 @@ const Transactions: React.FC = () => {
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
           } else {
-            // If it's just a 12 digit number, maybe it's just the ID part
+            // If it's just a 12 digit number, maybe it's just the ID part (front barcode of new card)
             if (/^\d{12}$/.test(data)) {
               setCustomerCCCD(data);
+              setIsWaitingForBackScan(true); // Likely new card front
               const notification = document.createElement('div');
               notification.className = 'fixed bottom-4 left-4 bg-ink text-paper px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 border-l-4 border-blue-400';
-              notification.innerText = 'Đã nhận nhanh Số thẻ / CCCD';
+              notification.innerText = 'Đã nhận Số thẻ. Vui lòng quét MẶT SAU để lấy địa chỉ.';
               document.body.appendChild(notification);
-              setTimeout(() => notification.remove(), 2500);
+              setTimeout(() => notification.remove(), 4000);
             }
           }
         }
@@ -191,7 +196,22 @@ const Transactions: React.FC = () => {
     if (typeof data === 'object' && data.id && data.name) {
       setCustomerName(data.name);
       setCustomerCCCD(data.id);
-      if (data.address) setCustomerAddress(data.address);
+      
+      if (data.address) {
+        setCustomerAddress(data.address);
+        setIsWaitingForBackScan(false);
+      } else if (data.cardType === 'NEW') {
+        setIsWaitingForBackScan(true);
+        // Alert user
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 left-4 bg-gold-primary text-ink px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest border-2 border-ink animate-bounce';
+        notification.innerText = 'THẺ MẪU MỚI: VUI LÒNG CHỤP MẶT SAU ĐỂ LẤY ĐỊA CHỈ';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
+      } else {
+        setIsWaitingForBackScan(false);
+      }
+
       setShowScanner(false);
       setLastError(null);
       return;
@@ -203,17 +223,19 @@ const Transactions: React.FC = () => {
       if (info) {
         setCustomerName(info.name);
         setCustomerCCCD(info.id);
-        if (info.address) setCustomerAddress(info.address);
+        if (info.address) {
+          setCustomerAddress(info.address);
+          setIsWaitingForBackScan(false);
+        }
         setShowScanner(false);
         setLastError(null);
       } else {
+        // Fallback or retry
         console.warn("Mã QR không đúng định dạng CCCD chuẩn:", data);
         const parts = data.split('|');
         if (parts.length > 2) {
-          alert(`Dữ liệu quét được: "${data.substring(0, 30)}..." không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
-        } else {
-          alert("Không nhận diện được nội dung CCCD. Vui lòng đảm bảo bạn đang quét mã QR ở góc trên cùng bên phải của thẻ CCCD gắn chip.");
-        }
+          alert(`Dữ liệu quét được không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
+        } 
       }
     }
   };
@@ -431,14 +453,43 @@ const Transactions: React.FC = () => {
             </div>
           </div>
 
-          <div className="input-field">
+          <div className="input-field relative">
             <label>Địa chỉ</label>
-            <input 
-              type="text" 
-              value={customerAddress} 
-              onChange={(e) => setCustomerAddress(e.target.value)} 
-              placeholder="Nơi thường trú" 
-            />
+            <div className="relative">
+              <input 
+                type="text" 
+                value={customerAddress} 
+                onChange={(e) => {
+                  setCustomerAddress(e.target.value);
+                  if (e.target.value.length > 3) setIsWaitingForBackScan(false);
+                }} 
+                placeholder="Nơi thường trú" 
+                className={isWaitingForBackScan ? 'ring-2 ring-gold-primary ring-inset pr-10' : ''}
+              />
+              {isWaitingForBackScan && (
+                <div 
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gold-dark animate-pulse"
+                  title="Vui lòng quét mặt sau để lấy địa chỉ"
+                >
+                  <QrCode size={18} />
+                </div>
+              )}
+            </div>
+            {isWaitingForBackScan && (
+              <motion.p 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-[9px] text-gold-dark font-black uppercase mt-1 tracking-widest flex justify-between items-center bg-gold-primary/10 px-2 py-1 rounded-sm border border-gold-primary/20"
+              >
+                <span>&rarr; Đã nhận diện mẫu thẻ mới/điện tử. Vui lòng quét MẶT SAU hoặc mã VNeID để lấy ĐỊA CHỈ</span>
+                <button 
+                  onClick={() => setIsWaitingForBackScan(false)}
+                  className="text-[8px] underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  Bỏ qua
+                </button>
+              </motion.p>
+            )}
           </div>
 
           {type === 'BUY' && (
