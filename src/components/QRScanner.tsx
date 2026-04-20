@@ -12,19 +12,13 @@ interface QRScannerProps {
 const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanningFile, setIsScanningFile] = useState(false);
   const [scannedData, setScannedData] = useState<CCCDAnalysisResult | null>(null);
   const [showBackPrompt, setShowBackPrompt] = useState(false);
-  const [isQRDetected, setIsQRDetected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const requestRef = useRef<number>(0);
-
-  // Use a ref for processResult to avoid stale closures in requestAnimationFrame
-  const processResultRef = useRef<(result: CCCDAnalysisResult) => void>(() => {});
 
   const handleFinishEarly = useCallback(() => {
     if (scannedData) {
@@ -45,10 +39,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       onScan(result);
     }
   }, [onScan]);
-
-  useEffect(() => {
-    processResultRef.current = processResult;
-  }, [processResult]);
 
   const startCamera = useCallback(async () => {
     setIsInitializing(true);
@@ -118,90 +108,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     }
   }, []);
 
-  const isScanningActive = useRef(true);
-  const lastScanTime = useRef(0);
-
-  const scanQRCode = useCallback(() => {
-    if (!isScanningActive.current) return;
-
-    if (!videoRef.current || isProcessing || isInitializing || showBackPrompt) {
-      requestRef.current = requestAnimationFrame(scanQRCode);
-      return;
-    }
-
-    const now = Date.now();
-    // Throttle: Scan every 250ms (4 times a second) to save CPU/Prevent UI lock
-    if (now - lastScanTime.current < 250) {
-      requestRef.current = requestAnimationFrame(scanQRCode);
-      return;
-    }
-    lastScanTime.current = now;
-
-    try {
-      const video = videoRef.current;
-      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
-        if (!scanCanvasRef.current) {
-          scanCanvasRef.current = document.createElement('canvas');
-        }
-        
-        const canvas = scanCanvasRef.current;
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-        
-        if (context) {
-          // Downscale for performance
-          const scale = 0.5;
-          canvas.width = video.videoWidth * scale;
-          canvas.height = video.videoHeight * scale;
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Handle CJS/ESM jsQR import safely
-          const jsqrFunc = (jsQR as any).default || jsQR;
-          if (typeof jsqrFunc === 'function') {
-            const code = jsqrFunc(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "dontInvert",
-            });
-
-            if (code && code.data) {
-              setIsQRDetected(true);
-              const parsed = parseCCCD(code.data);
-              if (parsed && parsed.id) {
-                const result: CCCDAnalysisResult = {
-                  ...parsed,
-                  cardType: 'NEW',
-                  side: 'ALL'
-                };
-                isScanningActive.current = false; // Stop further scans
-                processResultRef.current(result);
-                return; 
-              }
-            } else {
-              setIsQRDetected(false);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("QR Scan Loop Error:", err);
-    }
-    
-    requestRef.current = requestAnimationFrame(scanQRCode);
-  }, [isProcessing, isInitializing, showBackPrompt]);
-
   useEffect(() => {
-    isScanningActive.current = true;
     startCamera();
-    requestRef.current = requestAnimationFrame(scanQRCode);
     return () => {
-      isScanningActive.current = false;
-      cancelAnimationFrame(requestRef.current);
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [startCamera, scanQRCode]);
+  }, [startCamera]);
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
@@ -357,19 +272,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
 
           {!isInitializing && !error && !showBackPrompt && (
             <>
-              <div className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-300 ${isQRDetected ? 'opacity-100' : 'opacity-40'}`}>
-                <div className={`absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                
-                {isQRDetected && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full animate-pulse border border-green-500/50">
-                      <QrCode className="text-green-500" size={48} />
-                    </div>
-                  </div>
-                )}
+              <div className="absolute inset-0 pointer-events-none z-0 opacity-40">
+                <div className="absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 border-gold-primary transition-all"></div>
+                <div className="absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 border-gold-primary transition-all"></div>
+                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 border-gold-primary transition-all"></div>
+                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 border-gold-primary transition-all"></div>
               </div>
               
               <div className="absolute bottom-6 inset-x-0 flex justify-center z-10">
@@ -378,12 +285,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                   disabled={isProcessing}
                   className="group relative flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 bg-white/20 rounded-full blur-md group-hover:bg-gold-primary/30 transition-all duration-300"></div>
-                  <div className="bg-white p-4 rounded-full shadow-2xl ring-8 ring-white/10 active:scale-95 transition-transform">
-                    <Zap size={24} className="text-ink fill-ink" />
+                  <div className="absolute inset-0 bg-gold-primary/20 rounded-full scale-125 blur-md animate-pulse"></div>
+                  <div className="w-16 h-16 bg-gold-primary rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-transform">
+                    <Camera size={28} className="text-ink" />
                   </div>
-                  <p className="absolute -bottom-6 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-60">
-                    {scannedData ? 'Quét Mã QR Mặt Sau' : 'Chụp Mặt Trước'}
+                  <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-80 bg-ink/50 px-2 py-0.5 rounded shadow-sm">
+                    {scannedData ? 'CHỤP MÃ QR MẶT SAU' : 'CHỤP MẶT TRƯỚC'}
                   </p>
                 </button>
               </div>
