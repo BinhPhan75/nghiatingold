@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus, RefreshCw } from 'lucide-react';
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,7 +46,6 @@ const Transactions: React.FC = () => {
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isWaitingForBackScan, setIsWaitingForBackScan] = useState(false);
-  const [showBackScanPrompt, setShowBackScanPrompt] = useState(false);
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -193,7 +192,7 @@ const Transactions: React.FC = () => {
     
     console.log("Dữ liệu quét được:", data);
     
-    // Case 1: Data is an object from AI analysis (from Photo upload or Live AI Capture)
+    // Case 1: Data is an object from AI analysis
     if (typeof data === 'object' && data.id && data.name) {
       setCustomerName(data.name);
       setCustomerCCCD(data.id);
@@ -201,19 +200,19 @@ const Transactions: React.FC = () => {
       if (data.address) {
         setCustomerAddress(data.address);
         setIsWaitingForBackScan(false);
-        setShowBackScanPrompt(false);
-        setShowScanner(false);
       } else if (data.cardType === 'NEW') {
         setIsWaitingForBackScan(true);
-        setShowBackScanPrompt(true);
-        // We keep setShowScanner(true) so the scanner modal stays open, 
-        // but we'll overlay the prompt on top of it or inside it.
+        // Alert user
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 left-4 bg-gold-primary text-ink px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest border-2 border-ink animate-bounce';
+        notification.innerText = 'THẺ MẪU MỚI: VUI LÒNG CHỤP MẶT SAU ĐỂ LẤY ĐỊA CHỈ';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
       } else {
         setIsWaitingForBackScan(false);
-        setShowBackScanPrompt(false);
-        setShowScanner(false);
       }
 
+      setShowScanner(false);
       setLastError(null);
       return;
     }
@@ -227,13 +226,8 @@ const Transactions: React.FC = () => {
         if (info.address) {
           setCustomerAddress(info.address);
           setIsWaitingForBackScan(false);
-          setShowBackScanPrompt(false);
-          setShowScanner(false);
-        } else {
-          // It's a QR but might be the ID part only (rare for QR but possible)
-          setIsWaitingForBackScan(true);
-          setShowBackScanPrompt(true);
         }
+        setShowScanner(false);
         setLastError(null);
       } else {
         // Fallback or retry
@@ -776,55 +770,9 @@ const Transactions: React.FC = () => {
       {showScanner && (
         <QRScanner 
           onScan={handleScan} 
-          onClose={() => {
-            setShowScanner(false);
-            setShowBackScanPrompt(false);
-          }} 
+          onClose={() => setShowScanner(false)} 
         />
       )}
-
-      <AnimatePresence>
-        {showBackScanPrompt && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/80 backdrop-blur-md p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white p-8 rounded-sm max-w-sm w-full border-t-8 border-gold-primary shadow-2xl relative"
-            >
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gold-primary text-ink px-4 py-2 font-black text-xs uppercase tracking-[0.3em] shadow-lg">
-                Xác nhận
-              </div>
-              <h4 className="text-xl font-bold mb-4 text-ink italic">Đã nhận diện Thẻ mới / Điện tử</h4>
-              <p className="text-xs text-neutral-500 mb-8 leading-relaxed font-medium">
-                Hệ thống đã lấy được thông tin cơ bản. Bạn có muốn tiếp tục <span className="text-ink font-bold underline decoration-gold-primary underline-offset-4">QUÉT MẶT SAU</span> để lấy thêm thông tin địa chỉ không?
-              </p>
-              
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={() => setShowBackScanPrompt(false)}
-                  className="bg-gold-primary text-ink py-4 font-black uppercase text-[10px] tracking-widest hover:bg-gold-dark transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  <RefreshCw size={14} className="animate-spin-slow" /> Tiếp tục quét mặt sau
-                </button>
-                <button 
-                  onClick={() => {
-                    setShowBackScanPrompt(false);
-                    setShowScanner(false);
-                  }}
-                  className="bg-neutral-100 text-neutral-400 py-3 font-black uppercase text-[10px] tracking-widest hover:bg-neutral-200 hover:text-ink transition-all"
-                >
-                  Kết thúc tại đây
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       </div>
     </div>
   );
