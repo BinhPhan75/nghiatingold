@@ -40,12 +40,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         await html5QrCode.start(
           { facingMode: "environment" }, 
           config, 
-          (decodedText) => {
-            if (!paused && !isProcessing) {
-              onScan(decodedText);
-            }
-          },
-          (errorMessage) => { }
+          // Disable auto-QR scan for phone camera as per user: 
+          // "phone scan is whole card, not QR"
+          () => {}, 
+          () => { }
         );
         setIsInitializing(false);
       } catch (err: any) {
@@ -218,7 +216,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         {!(isInitializing || error) && (
           <div className="p-4 bg-neutral-50 border-t border-neutral-100 italic flex justify-between items-center px-6">
             <p className="text-[10px] text-ink font-medium leading-relaxed max-w-[180px]">
-              Đưa CCCD vào khung hình rồi nhấn nút chụp để AI phân tích.
+              Căn chỉnh thẻ CCCD vào khung hình rồi nhấn nút chụp để AI bốc tách thông tin.
             </p>
             <div className="flex gap-2">
               <input 

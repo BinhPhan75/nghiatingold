@@ -13,7 +13,11 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         {
           parts: [
             {
-              text: "OCR CCCD Việt Nam. JSON: {id, name, dob, gender, address, cardType: 'OLD'|'NEW'}. VNeID: lấy địa chỉ bên dưới hình thẻ. ONLY JSON."
+              text: "Đọc và bốc tách TOÀN BỘ thông tin từ mặt trước/sau thẻ CCCD Việt Nam hoặc VNeID. " +
+                    "KHÔNG tìm mã QR, chỉ đọc chữ in trên thẻ. " +
+                    "JSON: {id, name, dob, gender, address, cardType: 'OLD'|'NEW'}. " +
+                    "VNeID: lấy địa chỉ bên dưới hình thẻ ảo. " +
+                    "CHỈ TRẢ VỀ JSON."
             },
             {
               inlineData: {
