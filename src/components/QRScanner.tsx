@@ -6,9 +6,10 @@ import { analyzeCCCDImage } from '../services/geminiService';
 interface QRScannerProps {
   onScan: (data: string | object) => void;
   onClose: () => void;
+  paused?: boolean;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -33,7 +34,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           { facingMode: "environment" }, 
           config, 
           (decodedText) => {
-            onScan(decodedText);
+            if (!paused && !isProcessing) {
+              onScan(decodedText);
+            }
           },
           (errorMessage) => { }
         );
@@ -64,7 +67,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   };
 
   const handleManualCapture = async () => {
-    if (!scannerRef.current || !scannerRef.current.isScanning) return;
+    if (!scannerRef.current || !scannerRef.current.isScanning || paused) return;
     
     setIsProcessing(true);
     try {

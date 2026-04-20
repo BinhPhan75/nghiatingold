@@ -230,18 +230,31 @@ const Transactions: React.FC = () => {
           setShowBackScanPrompt(false);
           setShowScanner(false);
         } else {
-          // It's a QR but might be the ID part only (rare for QR but possible)
+          // It's a QR but might be the ID part only
           setIsWaitingForBackScan(true);
           setShowBackScanPrompt(true);
         }
         setLastError(null);
       } else {
+        // Fallback for simple 12-digit ID (front card barcode)
+        const cleanData = data.trim();
+        if (/^\d{12}$/.test(cleanData)) {
+          setCustomerCCCD(cleanData);
+          setIsWaitingForBackScan(true);
+          setShowBackScanPrompt(true);
+          setLastError(null);
+          return;
+        }
+
         // Fallback or retry
         console.warn("Mã QR không đúng định dạng CCCD chuẩn:", data);
         const parts = data.split('|');
         if (parts.length > 2) {
           alert(`Dữ liệu quét được không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
-        } 
+        } else {
+          // If it's a random string, don't just hang, maybe show a small toast or log
+          console.log("Unrecognized scan format:", data);
+        }
       }
     }
   };
@@ -780,6 +793,7 @@ const Transactions: React.FC = () => {
             setShowScanner(false);
             setShowBackScanPrompt(false);
           }} 
+          paused={showBackScanPrompt}
         />
       )}
 

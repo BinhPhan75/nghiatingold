@@ -48,7 +48,8 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         name: result.name,
         dob: result.dob || '',
         gender: result.gender || '',
-        address: result.address || ''
+        address: result.address || '',
+        cardType: result.cardType
       };
     }
     return null;
