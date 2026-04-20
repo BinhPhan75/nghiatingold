@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { X, Camera, RefreshCw, QrCode, Upload, Zap, Sparkles, XCircle } from 'lucide-react';
 import { analyzeCCCDImage } from '../services/geminiService';
 
@@ -25,9 +25,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 25, 
-          qrbox: { width: 300, height: 300 },
-          aspectRatio: 1.0
+          fps: 30, 
+          qrbox: { width: 320, height: 320 },
+          aspectRatio: 1.0,
+          formatsToSupport: [ 
+            Html5QrcodeSupportedFormats.QR_CODE, 
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.AZTEC
+          ]
         };
 
         await html5QrCode.start(
