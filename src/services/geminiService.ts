@@ -13,9 +13,15 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         {
           parts: [
             {
-              text: "Bốc tách thông tin từ CCCD Việt Nam hoặc VNeID. " +
-                    "Trả về JSON: {id, name, dob, gender, address, cardType: 'OLD'|'NEW'}. " +
-                    "Lấy đầy đủ thông tin từ chữ in trên thẻ. CHỈ TRẢ VỀ JSON."
+              text: "Trích xuất thông tin định danh từ thẻ Căn cước công dân (CCCD) Việt Nam hoặc ứng dụng VNeID. " +
+                    "Các trường cần lấy: " +
+                    "- id: Số CCCD (12 chữ số) " +
+                    "- name: Họ và tên (chữ IN HOA) " +
+                    "- dob: Ngày sinh (DD/MM/YYYY) " +
+                    "- gender: Giới tính " +
+                    "- address: Nơi thường trú/địa chỉ (với VNeID lấy ở dòng dưới cùng dưới ảnh thẻ). " +
+                    "- cardType: 'NEW' (thẻ gắn chip) hoặc 'OLD' (thẻ mã vạch/VNeID). " +
+                    "Kết quả trả về định dạng JSON máy đọc được. CHỈ TRẢ VỀ JSON."
             },
             {
               inlineData: {

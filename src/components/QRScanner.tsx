@@ -35,7 +35,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
   const startScanner = async (idx?: number) => {
     setIsInitializing(true);
     setError(null);
-    const cameraIdx = idx !== undefined ? idx : currentCameraIdx;
 
     try {
       if (scannerRef.current) {
@@ -45,41 +44,72 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
       const html5QrCode = new Html5Qrcode('reader');
       scannerRef.current = html5QrCode;
 
-      const deviceList = await Html5Qrcode.getCameras();
-      setCameras(deviceList);
+      // Filter for back cameras only
+      const allDevices = await Html5Qrcode.getCameras();
+      const backCameras = allDevices.filter(device => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('rear') ||
+        device.label.toLowerCase().includes('environment') ||
+        device.label.toLowerCase().includes('sau') ||
+        // If no labels, we'll have to take them all but the first one is often front
+        allDevices.length > 1
+      );
+      
+      const targetCameras = backCameras.length > 0 ? backCameras : allDevices;
+      setCameras(targetCameras);
 
+      const cameraIdx = idx !== undefined ? idx : currentCameraIdx;
+      
       let cameraConfig: any = { facingMode: "environment" };
-      if (deviceList.length > 0) {
-        const selectedId = deviceList[cameraIdx % deviceList.length].id;
+      if (targetCameras.length > 0) {
+        const selectedId = targetCameras[cameraIdx % targetCameras.length].id;
         cameraConfig = { deviceId: { exact: selectedId } };
       }
 
       const config = { 
         fps: 25, 
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const boxSize = Math.floor(minEdge * 0.7);
-          return { width: boxSize, height: boxSize };
+          // Standard CCCD ratio ~1.58
+          const boxWidth = Math.floor(viewfinderWidth * 0.9);
+          const boxHeight = Math.floor(boxWidth / 1.58);
+          // Safety cap
+          const finalHeight = Math.min(boxHeight, viewfinderHeight * 0.8);
+          return { width: boxWidth, height: finalHeight };
         },
         aspectRatio: 1.333333,
         videoConstraints: {
-          ...cameraConfig,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: { exact: "environment" }, // FORCE BACK CAMERA
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 }
         }
       };
 
-      await html5QrCode.start(
-        cameraConfig, 
-        config, 
-        (decodedText) => {
-          if (!paused && !isProcessing) {
-            if (navigator.vibrate) navigator.vibrate(50);
-            onScan(decodedText);
-          }
-        },
-        () => { }
-      );
+      try {
+        await html5QrCode.start(
+          { facingMode: { exact: "environment" } }, 
+          config, 
+          (decodedText) => {
+            if (!paused && !isProcessing) {
+              if (navigator.vibrate) navigator.vibrate(50);
+              onScan(decodedText);
+            }
+          },
+          () => { }
+        );
+      } catch (err) {
+        // Fallback to non-exact environment if exact fails
+        await html5QrCode.start(
+          { facingMode: "environment" }, 
+          config, 
+          (decodedText) => {
+            if (!paused && !isProcessing) {
+              if (navigator.vibrate) navigator.vibrate(50);
+              onScan(decodedText);
+            }
+          },
+          () => { }
+        );
+      }
 
       setIsInitializing(false);
       
@@ -146,8 +176,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
       if (!ctx) return;
       
       ctx.drawImage(video, 0, 0);
-      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.9);
 
+      // AI Analysis only for manual capture as per user intent
       const result = await analyzeCCCDImage(base64Image);
       if (result) {
         if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
@@ -249,11 +280,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
           {!isInitializing && !error && (
             <>
               <div className="absolute inset-0 pointer-events-none z-10 p-10">
-                <div className="w-full h-full border border-white/20 relative rounded-2xl">
-                  <div className="absolute top-0 left-0 w-12 h-12 border-t-8 border-l-8 border-gold-primary rounded-tl-2xl"></div>
-                  <div className="absolute top-0 right-0 w-12 h-12 border-t-8 border-r-8 border-gold-primary rounded-tr-2xl"></div>
-                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-8 border-l-8 border-gold-primary rounded-bl-2xl"></div>
-                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-8 border-r-8 border-gold-primary rounded-br-2xl"></div>
+                <div className="w-full h-full border border-white/20 relative rounded-xl">
+                  {/* Aspect ratio guide for CCCD */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                     <div className="w-[85%] aspect-[1.58] border-2 border-white rounded-lg"></div>
+                  </div>
+                  
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-8 border-l-8 border-gold-primary rounded-tl-xl"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-8 border-r-8 border-gold-primary rounded-tr-xl"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-8 border-l-8 border-gold-primary rounded-bl-xl"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-8 border-r-8 border-gold-primary rounded-br-xl"></div>
                   
                   {/* Laser Line */}
                   <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-gold-primary to-transparent shadow-[0_0_20px_#D4AF37] animate-[scanner_3s_ease-in-out_infinite]"></div>
