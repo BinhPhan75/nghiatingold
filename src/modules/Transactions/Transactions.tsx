@@ -34,6 +34,7 @@ const Transactions: React.FC = () => {
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -174,11 +175,17 @@ const Transactions: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (submitting) {
+      alert("Giao dịch đã được ghi nhận vào hệ thống. Vui lòng không bấm liên tiếp.");
+      return;
+    }
+
     if (!selectedProduct || !customerName || !customerCCCD) {
       alert("Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
+    setSubmitting(true);
     const transaction: Omit<Transaction, 'id'> = {
       type,
       customer_name: customerName,
@@ -212,6 +219,7 @@ const Transactions: React.FC = () => {
           setShowQR(true);
         } else {
           alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ.");
+          setSubmitting(false);
         }
       } else {
         // For BUY transactions, generate QR for the SHOP to pay CUSTOMER
@@ -230,6 +238,7 @@ const Transactions: React.FC = () => {
         }
       }
     } catch (error: any) {
+      setSubmitting(false);
       setLastError(error);
       alert("Đã có lỗi xảy ra khi lưu giao dịch: " + (error.message || "Kiểm tra quyền truy cập database"));
     }
@@ -246,6 +255,7 @@ const Transactions: React.FC = () => {
     setSelectedProduct(null);
     setShowSuccess(false);
     setShowQR(false);
+    setSubmitting(false);
   };
 
   const { user } = useAuth();
@@ -470,9 +480,12 @@ const Transactions: React.FC = () => {
 
           <button 
             onClick={handleSubmit}
-            className={`vcb-btn w-full flex items-center justify-center gap-3 ${type === 'BUY' ? 'bg-ink' : ''}`}
+            disabled={submitting}
+            className={`vcb-btn w-full flex items-center justify-center gap-3 ${type === 'BUY' ? 'bg-ink' : ''} ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {type === 'SELL' ? (
+            {submitting ? (
+              <><Send className="animate-pulse" size={20} /> ĐANG LƯU HỆ THỐNG...</>
+            ) : type === 'SELL' ? (
               <><QrCode size={20} /> Tạo mã thanh toán QR</>
             ) : (
               <><CheckCircle2 size={20} /> Xác nhận & Lưu giao dịch</>
