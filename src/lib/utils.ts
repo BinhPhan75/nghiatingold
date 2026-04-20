@@ -8,7 +8,6 @@ export interface CCCDInfo {
   dob: string;
   gender: string;
   address: string;
-  cardType?: 'OLD' | 'NEW' | 'UNKNOWN';
 }
 
 export const parseCCCD = (qrData: string): CCCDInfo | null => {
@@ -30,15 +29,15 @@ export const parseCCCD = (qrData: string): CCCDInfo | null => {
 
     const cccdId = parts[0]?.trim();
     // In newer cards (Căn cước), if they don't have an old ID, parts[1] might be empty.
+    // The format still follows the pipe structure.
     const cccdName = parts[2]?.trim();
     
     if (!cccdId || !cccdName) return null;
 
-    // Detect card type from pipe string
-    // Usually, the QR on the back of new identity cards (2024) still follows the 7-part pipe format
-    // However, if the data is shorter or certain fields are empty, we might guess.
-    // Realistically, the pipe string is very similar. Gemini will be better at this.
-    const cardType: 'OLD' | 'NEW' | 'UNKNOWN' = 'UNKNOWN';
+    // Check if ID is likely a 12-digit number (standard)
+    if (!/^\d{12}$/.test(cccdId)) {
+      console.warn("Extracted ID does not look like a 12-digit CCCD:", cccdId);
+    }
 
     return {
       id: cccdId,
@@ -46,7 +45,6 @@ export const parseCCCD = (qrData: string): CCCDInfo | null => {
       dob: parts[3]?.trim() || '',
       gender: parts[4]?.trim() || '',
       address: parts[5]?.trim() || '',
-      cardType,
     };
   } catch (e) {
     console.error("Error parsing CCCD QR", e);
