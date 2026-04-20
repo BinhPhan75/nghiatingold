@@ -1,21 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CCCDInfo } from "../lib/utils";
 
-// Lazy initialize to avoid potential crashes at module load if env vars are missing
-let aiInstance: any = null;
+// Initialize AI globally but lazily
+let ai: any = null;
 
 const getAI = () => {
-  if (aiInstance) return aiInstance;
-  
+  if (ai) return ai;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("GEMINI_API_KEY is missing");
-  }
-  
-  aiInstance = new GoogleGenAI({ 
-    apiKey: apiKey || '' 
-  });
-  return aiInstance;
+  if (!apiKey) console.error("GEMINI_API_KEY missing");
+  ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  return ai;
 };
 
 export interface CCCDAnalysisResult extends CCCDInfo {
@@ -25,73 +19,67 @@ export interface CCCDAnalysisResult extends CCCDInfo {
 
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysisResult | null> => {
   try {
-    const genAI = getAI();
-    // Use the standard model initialization to be safe
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const client = getAI();
     
-    const result = await model.generateContent([
-      {
-        text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
-
-PHÂN LOẠI THẺ VÀ QUY TRÌNH:
-1. "OCR MODE" (CCCD Cũ/Mã vạch - Mặt trước): Tập trung đọc CHỮ in trên thẻ. Trích xuất: ID (12 số), Họ tên (VIẾT HOA), Ngày sinh, Quê quán, Nơi thường trú (lưu vào address). Đặc điểm: Thẻ này KHÔNG có chip, KHÔNG có mã QR mặt trước.
-2. "QR MODE" (CCCD Gắn chip - Mặt sau): Đây là định dạng chuẩn nhất. Ưu tiên giải mã chuỗi text từ MÃ QR. 
-
-QUY TẮC TRÍCH XUẤT OCR (THẺ CŨ - MẶT TRƯỚC):
-- Số / No: -> id
-- Họ và tên / Full name: -> name (Chuyển về chữ IN HOA có dấu)
-- Ngày, tháng, năm sinh / Date of birth: -> dob
-- Nơi thường trú / Place of residence: -> address
-- Nếu ảnh mờ, hãy phân tích các nét chữ còn sót lại để đoán từ chính xác nhất (ví dụ: "Thanh Hoá", "Nghệ An"...).
-
-QUY TẮC TRÍCH XUẤT QR:
-Dữ liệu từ QR có dạng: [ID]|[Số_cũ]|[HỌ_TÊN]|[Ngày_sinh]|[Giới_tính]|[Địa_chỉ]|[Ngày_cấp]
-=> Nếu nhận diện được định dạng này, bỏ qua mọi kết quả OCR khác và lấy 100% từ đây.
-
-KIỂM TRA DỮ LIỆU (VALIDATION):
-   - id: Luôn là 12 chữ số.
-   - name: Luôn viết hoa có dấu.
-   - dob: Định dạng DD/MM/YYYY.
-   - address: Phải bao gồm đầy đủ số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố nếu có.
-   - cardType: Phân loại đúng dựa trên tiêu đề thẻ.
-   - side: FRONT/BACK/ALL.
-
-TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. KHÔNG GIẢI THÍCH.`
-      },
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Image.split(',')[1] || base64Image
+    const response = await client.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          parts: [
+            { text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam.
+                     YÊU CẦU:
+                     1. Phân loại "cardType": OLD (mã vạch), NEW (gắn chip), ELECTRONIC (VNeID).
+                     2. Trích xuất CỰC KỲ CHÍNH XÁC: id (12 số), name (In hoa có dấu), dob (DD/MM/YYYY), address (Nơi thường trú).
+                     3. QUY TẮC THẺ CŨ (OLD):
+                        - "Số / No": -> id
+                        - "Họ và tên / Full name": -> name
+                        - "Ngày sinh / Date of birth": -> dob
+                        - "Quê quán / Place of birth": -> address (Nếu địa chỉ mờ)
+                        - "Nơi thường trú / Place of residence": -> address
+                     4. Nếu bất kỳ trường nào mờ, hãy dùng kiến thức về địa danh Việt Nam để khôi phục (ví dụ: "Thanh Hoá", "Hà Nội").
+                     5. Trả về JSON theo đúng schema.` },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Image.split(',')[1] || base64Image
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          required: ["id", "name", "dob", "address", "cardType", "side"],
+          properties: {
+            id: { type: Type.STRING, description: "ID số thẻ" },
+            name: { type: Type.STRING, description: "Họ và tên viết hoa" },
+            dob: { type: Type.STRING, description: "Ngày sinh DD/MM/YYYY" },
+            address: { type: Type.STRING, description: "Nơi thường trú hoặc quê quán" },
+            cardType: { type: Type.STRING, enum: ["OLD", "NEW", "ELECTRONIC"] },
+            side: { type: Type.STRING, enum: ["FRONT", "BACK", "ALL"] },
+            gender: { type: Type.STRING }
+          }
         }
       }
-    ]);
+    });
 
-    const resultText = result.response.text();
+    const resultText = response.text;
     if (!resultText) return null;
 
-    // Robust JSON extraction from potential markdown blocks
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : resultText.trim();
-    
-    try {
-      const parsed = JSON.parse(jsonStr);
-      console.log("AI Analysis Result:", parsed);
-
-      return {
-        id: (parsed.id || '').replace(/\s/g, ''),
-        name: (parsed.name || '').toUpperCase(),
-        dob: parsed.dob || '',
-        gender: parsed.gender || '',
-        address: parsed.address || '',
-        cardType: parsed.cardType || 'OLD',
-        side: parsed.side || 'FRONT'
-      };
-    } catch (e) {
-      console.error("AI returned invalid JSON:", resultText);
-      throw new Error("Dữ liệu trả về từ AI không hợp lệ. Vui lòng thử lại.");
-    }
+    const parsed = JSON.parse(resultText);
+    return {
+      id: (parsed.id || '').replace(/\s/g, ''),
+      name: (parsed.name || '').toUpperCase(),
+      dob: parsed.dob || '',
+      gender: parsed.gender || '',
+      address: parsed.address || '',
+      cardType: parsed.cardType || 'OLD',
+      side: parsed.side || 'FRONT'
+    };
   } catch (error: any) {
-    console.error("AI Analysis Error (Client):", error);
+    console.error("Gemini Analysis Error:", error);
     throw error;
   }
 };

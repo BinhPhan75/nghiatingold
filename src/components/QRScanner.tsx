@@ -72,15 +72,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Wait for metadata to be loaded for better stability on iOS
+          // Wait for metadata
           await new Promise((resolve) => {
              if (!videoRef.current) return resolve(null);
              videoRef.current.onloadedmetadata = () => resolve(null);
-             // Timeout fallback
              setTimeout(resolve, 1000);
           });
           await videoRef.current.play().catch(e => console.warn("Auto-play failed:", e));
-          setIsInitializing(false);
+          // Success!
           return true;
         }
       } catch (err) {
@@ -90,8 +89,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       return false;
     };
 
+    let success = false;
     // Attempt 1: Back camera with ideal resolution
-    let success = await tryStream({
+    success = await tryStream({
       video: {
         facingMode: { ideal: 'environment' },
         width: { ideal: 1280 },
@@ -99,43 +99,35 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       }
     });
 
-    // Attempt 2: Basic back camera
     if (!success) {
       success = await tryStream({
         video: { facingMode: 'environment' }
       });
     }
 
-    // Attempt 3: Any camera at all
     if (!success) {
       success = await tryStream({ video: true });
     }
 
     if (!success) {
       const isIframe = window.self !== window.top;
-      let errMsg = "Không thể kết nối máy ảnh. ";
-      
-      if (isIframe) {
-        errMsg += "Vui lòng mở trong tab mới để cấp quyền.";
-      } else {
-        errMsg += "Vui lòng kiểm tra quyền truy cập camera.";
-      }
-      
-      setError(errMsg);
-      setIsInitializing(false);
+      setError(isIframe ? "Mở trong tab mới để cấp quyền camera." : "Không thể kết nối máy ảnh.");
     }
+    
+    setIsInitializing(false);
   }, []);
 
   const scanQRCode = useCallback(() => {
+    // Stable loop: don't depend on state for the loop itself
     if (mode !== 'qr' || !isScanningActive.current) return;
 
-    if (!videoRef.current || isProcessing || isInitializing || showBackPrompt) {
+    if (!videoRef.current || showBackPrompt) {
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
 
     const now = Date.now();
-    if (now - lastScanTime.current < 200) { // Zalo speed: 5 times per second
+    if (now - lastScanTime.current < 250) { 
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
@@ -159,7 +151,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
           if (code && code.data && code.data.includes('|')) {
             setIsQRDetected(true);
             isScanningActive.current = false;
-            // Immediate visual success, then callback
             setTimeout(() => onScan(code.data), 400);
             return;
           }
@@ -169,7 +160,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       console.error("QR Scan Loop Error:", e);
     }
     requestRef.current = requestAnimationFrame(scanQRCode);
-  }, [mode, isProcessing, isInitializing, showBackPrompt, onScan]);
+  }, [mode, showBackPrompt, onScan]);
 
   useEffect(() => {
     startCamera();
@@ -180,13 +171,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     return () => {
       isScanningActive.current = false;
       cancelAnimationFrame(requestRef.current);
-      if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [startCamera, scanQRCode, mode]);
+  }, [mode]); // Only depend on mode to avoid loops
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
@@ -266,7 +256,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
       <div className="bg-white rounded-sm w-full max-w-sm overflow-hidden relative shadow-2xl border-2 border-gold-primary/30">
         <div className="p-4 border-b flex justify-between items-center bg-ink text-paper text-sm">
           <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-gold-primary animate-pulse" />
+            <Sparkles size={18} className="text-gold-primary" />
             <h3 className="font-black text-[10px] uppercase tracking-[0.2em] m-0">
               {showBackPrompt ? 'Quét Mã QR Mặt Sau' : mode === 'qr' ? 'Quét Mã QR CCCD Chip' : 'Chụp CCCD Cũ / Điện tử'}
             </h3>
@@ -287,12 +277,25 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
             className="w-full h-full object-cover"
           />
           
-          {(isInitializing || isScanningFile || isProcessing) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/60 backdrop-blur-sm z-10">
-              <Loader2 className="animate-spin mb-4 text-gold-primary" size={32} />
-              <p className="text-[10px] uppercase font-black tracking-widest text-center px-8">
-                {isScanningFile ? 'Đang phân tích file ảnh...' : isProcessing ? 'AI đang nhận diện...' : 'Đang khởi động camera...'}
-              </p>
+          {(isScanningFile || isProcessing) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/40 backdrop-blur-[2px] z-10 transition-all duration-300">
+              <div className="flex flex-col items-center bg-ink/80 p-5 rounded-sm border border-gold-primary/20 shadow-2xl">
+                <Loader2 className="animate-spin mb-3 text-gold-primary" size={24} />
+                <p className="text-[9px] uppercase font-black tracking-widest text-center px-4">
+                  {isScanningFile ? 'Đang phân tích file ảnh...' : 'AI đang xử lý thông tin...'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isInitializing && !error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+               <div className="flex flex-col items-center">
+                  <div className="w-12 h-1 border-2 border-gold-primary/20 bg-neutral-800 overflow-hidden rounded-full mb-3">
+                     <div className="h-full bg-gold-primary animate-[loading_1.5s_infinite_linear] origin-left"></div>
+                  </div>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-paper/60 italic">Đang tải máy ảnh...</p>
+               </div>
             </div>
           )}
 
