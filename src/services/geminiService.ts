@@ -1,10 +1,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CCCDInfo } from "../lib/utils";
 
-// Initialize Gemini on the frontend as per system instructions
-const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY || '' 
-});
+// Lazy initialize to avoid potential crashes at module load if env vars are missing
+let aiInstance: any = null;
+
+const getAI = () => {
+  if (aiInstance) return aiInstance;
+  
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is missing");
+  }
+  
+  aiInstance = new GoogleGenAI({ 
+    apiKey: apiKey || '' 
+  });
+  return aiInstance;
+};
 
 export interface CCCDAnalysisResult extends CCCDInfo {
   cardType: 'OLD' | 'NEW' | 'ELECTRONIC';
@@ -13,13 +25,13 @@ export interface CCCDAnalysisResult extends CCCDInfo {
 
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysisResult | null> => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [
-        {
-          parts: [
-            {
-              text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
+    const genAI = getAI();
+    // Use the standard model initialization to be safe
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const result = await model.generateContent([
+      {
+        text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
 
 PHÂN LOẠI THẺ VÀ QUY TRÌNH:
 1. "OLD": (CCCD mã vạch/ko chip) - Đọc mọi chữ trên mặt trước.
@@ -40,53 +52,29 @@ KIỂM TRA DỮ LIỆU (VALIDATION):
    - side: FRONT/BACK/ALL.
 
 TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. KHÔNG GIẢI THÍCH.`
-            },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Image.split(',')[1] || base64Image
-              }
-            }
-          ]
-        }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            name: { type: Type.STRING },
-            dob: { type: Type.STRING },
-            gender: { type: Type.STRING },
-            address: { type: Type.STRING },
-            cardType: { 
-              type: Type.STRING, 
-              enum: ["OLD", "NEW", "ELECTRONIC"] 
-            },
-            side: { 
-              type: Type.STRING, 
-              enum: ["FRONT", "BACK", "ALL"] 
-            }
-          }
+      },
+      {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64Image.split(',')[1] || base64Image
         }
       }
-    });
+    ]);
 
-    const resultText = response.text;
+    const resultText = result.response.text();
     if (!resultText) return null;
 
-    const result = JSON.parse(resultText.trim());
-    console.log("AI Analysis Result:", result);
+    const parsed = JSON.parse(resultText.trim());
+    console.log("AI Analysis Result:", parsed);
 
     return {
-      id: (result.id || '').replace(/\s/g, ''),
-      name: (result.name || '').toUpperCase(),
-      dob: result.dob || '',
-      gender: result.gender || '',
-      address: result.address || '',
-      cardType: result.cardType || 'OLD',
-      side: result.side || 'FRONT'
+      id: (parsed.id || '').replace(/\s/g, ''),
+      name: (parsed.name || '').toUpperCase(),
+      dob: parsed.dob || '',
+      gender: parsed.gender || '',
+      address: parsed.address || '',
+      cardType: parsed.cardType || 'OLD',
+      side: parsed.side || 'FRONT'
     };
   } catch (error: any) {
     console.error("AI Analysis Error (Client):", error);

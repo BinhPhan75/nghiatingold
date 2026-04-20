@@ -12,7 +12,7 @@ interface QRScannerProps {
 const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scanCanvasRef = useRef<HTMLCanvasElement>(document.createElement('canvas'));
+  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,6 +22,33 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const [isQRDetected, setIsQRDetected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef<number>(0);
+
+  // Use a ref for processResult to avoid stale closures in requestAnimationFrame
+  const processResultRef = useRef<(result: CCCDAnalysisResult) => void>(() => {});
+
+  const handleFinishEarly = useCallback(() => {
+    if (scannedData) {
+      onScan(scannedData);
+    }
+  }, [scannedData, onScan]);
+
+  const processResult = useCallback((result: CCCDAnalysisResult) => {
+    // Basic validation
+    if (!result.id && !result.name) return;
+
+    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD' || result.side === 'ALL') {
+      onScan(result);
+    } else if (result.cardType === 'NEW' && result.side === 'FRONT') {
+      setScannedData(result);
+      setShowBackPrompt(true);
+    } else {
+      onScan(result);
+    }
+  }, [onScan]);
+
+  useEffect(() => {
+    processResultRef.current = processResult;
+  }, [processResult]);
 
   const startCamera = useCallback(async () => {
     setIsInitializing(true);
@@ -41,7 +68,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         setIsInitializing(false);
       }
     } catch (err: any) {
-      console.error("Camera primary access failed:", err);
+      console.error("Camera access failed:", err);
+      // Retry with simpler constraints
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
@@ -49,57 +77,56 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           setIsInitializing(false);
         }
       } catch (retryErr) {
-        const isIframe = window.self !== window.top;
-        let errMsg = "Không thể mở máy ảnh. ";
-        if (isIframe) {
-          errMsg += "Môi trường xem thử (Iframe) có thể đang chặn camera. Hãy nhấn 'Mở Trong Tab Mới' bên dưới.";
-        } else {
-          errMsg += "Vui lòng cho phép quyền truy cập Camera trong cài đặt trình duyệt của bạn.";
-        }
-        setError(errMsg);
+        setError("Không thể mở máy ảnh. Vui lòng cấp quyền trong cài đặt trình duyệt.");
         setIsInitializing(false);
       }
     }
   }, []);
 
-  // Real-time QR Scanning Loop
   const scanQRCode = useCallback(() => {
-    if (!videoRef.current || !scanCanvasRef.current || isProcessing || isInitializing) {
+    if (!videoRef.current || isProcessing || isInitializing) {
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
 
     const video = videoRef.current;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      if (!scanCanvasRef.current) {
+        scanCanvasRef.current = document.createElement('canvas');
+      }
+      
       const canvas = scanCanvasRef.current;
       const context = canvas.getContext('2d', { willReadFrequently: true });
-      if (context) {
-        // Use a smaller area or lower res for scanning to save CPU
+      
+      if (context && video.videoWidth > 0 && video.videoHeight > 0) {
         canvas.width = video.videoWidth / 2;
         canvas.height = video.videoHeight / 2;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
+        
+        // Handle CJS/ESM jsQR import safely
+        const jsqrFunc = (jsQR as any).default || jsQR;
+        if (typeof jsqrFunc === 'function') {
+          const code = jsqrFunc(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
 
-        if (code) {
-          setIsQRDetected(true);
-          const parsed = parseCCCD(code.data);
-          if (parsed) {
-            // Auto-process if QR found
-            const result: CCCDAnalysisResult = {
-              ...parsed,
-              cardType: 'NEW', // Most QR-capable cards are new or old but QR is always full info
-              side: 'ALL'
-            };
-            processResult(result);
-            // Cancel further frames
-            return;
+          if (code) {
+            setIsQRDetected(true);
+            const parsed = parseCCCD(code.data);
+            if (parsed) {
+              const result: CCCDAnalysisResult = {
+                ...parsed,
+                cardType: 'NEW',
+                side: 'ALL'
+              };
+              processResultRef.current(result);
+              return; // Stop loop on success
+            }
+          } else {
+            setIsQRDetected(false);
           }
-        } else {
-          setIsQRDetected(false);
         }
       }
     }
@@ -111,8 +138,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     requestRef.current = requestAnimationFrame(scanQRCode);
     return () => {
       cancelAnimationFrame(requestRef.current);
-      const stream = videoRef.current?.srcObject as MediaStream;
-      stream?.getTracks().forEach(track => track.stop());
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
     };
   }, [startCamera, scanQRCode]);
 
@@ -120,17 +149,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
     
     setIsProcessing(true);
-    const flash = document.createElement('div');
-    flash.className = 'absolute inset-0 bg-white z-[60] animate-flash-fast';
-    videoRef.current.parentElement?.appendChild(flash);
-    setTimeout(() => flash.remove(), 300);
-
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
-      if (!context) return;
+      if (!context || video.videoWidth === 0) return;
 
       const containerAspect = 1.586;
       const videoAspect = video.videoWidth / video.videoHeight;
@@ -149,54 +173,23 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         sy = (video.videoHeight - sHeight) / 2;
       }
 
-      // Bump resolution for better AI OCR/QR reading
       canvas.width = 1600;
       canvas.height = 1000;
-      
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1600, 1000);
 
       const base64Image = canvas.toDataURL('image/jpeg', 0.9);
-      
       const info = await analyzeCCCDImage(base64Image);
-      if (info && (info.id || info.name || info.address)) {
+      
+      if (info) {
         processResult(info);
       } else {
-        alert("AI không thể đọc được. Hãy:\n1. Đưa thẻ lại gần hơn\n2. Đảm bảo mã QR hoặc thông tin không bị lóa\n3. Tránh để ngón tay che mất thông tin.");
+        alert("AI không thể nhận diện. Hãy thử lại với ảnh rõ nét hơn.");
       }
-    } catch (err: any) {
-      handleError(err);
+    } catch (err) {
+      console.error("Capture Error:", err);
+      alert("Đã xảy ra lỗi khi phân tích ảnh.");
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const processResult = (result: CCCDAnalysisResult) => {
-    // Basic validation of result
-    if (!result.id && !result.name) return;
-
-    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD' || result.side === 'ALL') {
-      // These cases provide full (or sufficient) info
-      onScan(result);
-    } else if (result.cardType === 'NEW' && result.side === 'FRONT') {
-      // New card front - ask for back QR
-      setScannedData(result);
-      setShowBackPrompt(true);
-    } else {
-      // Default fallback
-      onScan(result);
-    }
-  };
-
-  const handleError = (err: any) => {
-    console.error("Capture Analysis Error:", err);
-    if (err?.message?.includes('GEMINI_API_KEY')) {
-      alert("Lỗi cấu hình: Thiếu mã API AI. Vui lòng liên hệ quản trị viên.");
-    } else if (err?.message?.includes('fetch')) {
-      alert("Lỗi kết nối AI: Không thể kết nối tới máy chủ nhận diện. Vui lòng kiểm tra Wifi/4G của bạn.");
-    } else {
-      alert(err?.message || "Lỗi phần cứng hoặc AI. Vui lòng tải lại trang hoặc dùng tính năng tải ảnh.");
     }
   };
 
@@ -215,19 +208,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         } else {
           alert("AI không thể nhận diện được thông tin từ ảnh tải lên.");
         }
-      } catch (err) {
-        handleError(err);
+      } catch (err: any) {
+        console.error("Upload Scan Error:", err);
+        alert(err?.message || "Lỗi khi phân tích ảnh tải lên.");
       } finally {
         setIsScanningFile(false);
       }
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleFinishEarly = () => {
-    if (scannedData) {
-      onScan(scannedData);
-    }
   };
 
   return (
