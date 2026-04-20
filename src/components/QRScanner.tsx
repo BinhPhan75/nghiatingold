@@ -20,6 +20,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
   const [scannedData, setScannedData] = useState<CCCDAnalysisResult | null>(null);
   const [showBackPrompt, setShowBackPrompt] = useState(false);
   const [isQRDetected, setIsQRDetected] = useState(false);
+  const detectionTimeout = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number>(0);
@@ -47,10 +48,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
   }, [onScan]);
 
   const startCamera = useCallback(async () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      if (stream.active) {
+        setIsInitializing(false);
+        return;
+      }
+    }
+
     setIsInitializing(true);
     setError(null);
     
-    // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setError("Trình duyệt này không hỗ trợ truy cập máy ảnh.");
       setIsInitializing(false);
@@ -62,7 +70,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Important: explicitly call play() for some mobile browsers
           await videoRef.current.play().catch(e => console.warn("Auto-play failed:", e));
           setIsInitializing(false);
           return true;
@@ -87,7 +94,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     if (!success) {
       success = await tryStream({
         video: {
-          facingMode: 'environment', // strict but standard
+          facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -123,7 +130,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     }
 
     const now = Date.now();
-    if (now - lastScanTime.current < 400) { // Scan every 400ms for stability
+    if (now - lastScanTime.current < 400) { 
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
@@ -146,15 +153,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
 
           if (code && code.data) {
             setIsQRDetected(true);
+            if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
+            detectionTimeout.current = setTimeout(() => setIsQRDetected(false), 2000); // Hold for 2s
+
             const parsed = parseCCCD(code.data);
             if (parsed && parsed.id) {
               isScanningActive.current = false;
-              // Add a small delay for user to see the success state
               setTimeout(() => onScan(code.data), 500);
               return;
             }
-          } else {
-            setIsQRDetected(false);
           }
         }
       }
@@ -173,6 +180,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     return () => {
       isScanningActive.current = false;
       cancelAnimationFrame(requestRef.current);
+      if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
