@@ -22,27 +22,24 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysi
               text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
 
 PHÂN LOẠI THẺ VÀ QUY TRÌNH:
-1. "OLD": Thẻ ghi "CĂN CƯỚC CÔNG DÂN" (Mẫu cũ). Mọi thông tin cần thiết đều ở mặt trước.
-2. "NEW": Thẻ ghi "CĂN CƯỚC" (Mẫu mới từ 1/7/2024). 
-   - Mặt trước chỉ có Họ tên, Số ID. 
-   - MẶT SAU có MÃ QR chứa ĐẦY ĐỦ THÔNG TIN. Nếu bạn đang nhìn thấy mặt sau của thẻ "NEW", hãy ưu tiên đọc mã QR này.
-3. "ELECTRONIC": Ứng dụng VNeID (ghi "CĂN CƯỚC ĐIỆN TỬ"). Có đầy đủ thông tin trên 1 màn hình.
+1. "OLD": (CCCD mã vạch/ko chip) - Đọc mọi chữ trên mặt trước.
+2. "NEW": (Căn cước từ 7/2024) - Mặt trước có Tên/ID. MẶT SAU có Mã QR chứa 100% dữ liệu. Ưu tiên đọc QR bằng mọi giá.
+3. "ELECTRONIC": (VNeID) - Đọc mọi chữ trên màn hình.
 
-LƯU Ý QUAN TRỌNG KHI ĐỌC MÃ QR:
-Mã QR trên CCCD Việt Nam thường chứa chuỗi dữ liệu phân tách bởi dấu | theo định dạng:
-Số CCCD|Số CMND cũ|Họ tên|Ngày sinh|Giới tính|Địa chỉ thường trú|Ngày cấp.
-=> NẾU CÓ MÃ QR, HÃY ƯU TIÊN TRÍCH XUẤT TỪ ĐÓ VÌ NÓ CHÍNH XÁC 100%.
+QUY TẮC TRÍCH XUẤT QR (BẮT BUỘC):
+Nếu thấy mã QR, hãy cố gắng giải mã chuỗi text bên trong. Định dạng chuẩn là:
+[ID_12_SỐ]|[Số_CMND_Cũ]|[HỌ_TÊN_VIẾT_HOA]|[Ngày_Sinh_DDMMYYYY]|[Giới_Tính]|[Địa_Chỉ]|[Ngày_Cấp_DDMMYYYY]
+=> Ví dụ: 012345678912|123456789|NGUYỄN VĂN A|01011990|Nam|Hà Nội|01012024
 
-TRƯỜNG DỮ LIỆU:
-   - id: Số định danh (12 chữ số).
-   - name: Họ tên (Viết hoa, ví dụ: NGUYỄN VĂN A).
-   - dob: Ngày sinh (DD/MM/YYYY).
-   - gender: Giới tính (Nam/Nữ).
-   - address: Nơi thường trú (Hoặc "Địa chỉ").
-   - cardType: Phân loại ("OLD", "NEW", "ELECTRONIC").
-   - side: Mặt thẻ ("FRONT", "BACK", "ALL").
+KIỂM TRA DỮ LIỆU (VALIDATION):
+   - id: Luôn là 12 chữ số.
+   - name: Luôn viết hoa có dấu.
+   - dob: Định dạng DD/MM/YYYY.
+   - address: Phải bao gồm đầy đủ số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố nếu có.
+   - cardType: Phân loại đúng dựa trên tiêu đề thẻ.
+   - side: FRONT/BACK/ALL.
 
-TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. Nếu không thấy trường nào, hãy để trống "".`
+TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. KHÔNG GIẢI THÍCH.`
             },
             {
               inlineData: {

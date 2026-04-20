@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Camera, RefreshCw, Upload, Zap, Loader2, Sparkles, CheckCircle2, ChevronRight, CornerDownRight } from 'lucide-react';
+import { X, Camera, RefreshCw, Upload, Zap, Loader2, Sparkles, CheckCircle2, ChevronRight, CornerDownRight, QrCode } from 'lucide-react';
 import { analyzeCCCDImage, CCCDAnalysisResult } from '../services/geminiService';
+import jsQR from 'jsqr';
+import { parseCCCD } from '../lib/utils';
 
 interface QRScannerProps {
   onScan: (data: string | object) => void;
@@ -10,13 +12,16 @@ interface QRScannerProps {
 const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scanCanvasRef = useRef<HTMLCanvasElement>(document.createElement('canvas'));
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanningFile, setIsScanningFile] = useState(false);
   const [scannedData, setScannedData] = useState<CCCDAnalysisResult | null>(null);
   const [showBackPrompt, setShowBackPrompt] = useState(false);
+  const [isQRDetected, setIsQRDetected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const requestRef = useRef<number>(0);
 
   const startCamera = useCallback(async () => {
     setIsInitializing(true);
@@ -57,13 +62,59 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     }
   }, []);
 
+  // Real-time QR Scanning Loop
+  const scanQRCode = useCallback(() => {
+    if (!videoRef.current || !scanCanvasRef.current || isProcessing || isInitializing) {
+      requestRef.current = requestAnimationFrame(scanQRCode);
+      return;
+    }
+
+    const video = videoRef.current;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const canvas = scanCanvasRef.current;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (context) {
+        // Use a smaller area or lower res for scanning to save CPU
+        canvas.width = video.videoWidth / 2;
+        canvas.height = video.videoHeight / 2;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        if (code) {
+          setIsQRDetected(true);
+          const parsed = parseCCCD(code.data);
+          if (parsed) {
+            // Auto-process if QR found
+            const result: CCCDAnalysisResult = {
+              ...parsed,
+              cardType: 'NEW', // Most QR-capable cards are new or old but QR is always full info
+              side: 'ALL'
+            };
+            processResult(result);
+            // Cancel further frames
+            return;
+          }
+        } else {
+          setIsQRDetected(false);
+        }
+      }
+    }
+    requestRef.current = requestAnimationFrame(scanQRCode);
+  }, [isProcessing, isInitializing]);
+
   useEffect(() => {
     startCamera();
+    requestRef.current = requestAnimationFrame(scanQRCode);
     return () => {
+      cancelAnimationFrame(requestRef.current);
       const stream = videoRef.current?.srcObject as MediaStream;
       stream?.getTracks().forEach(track => track.stop());
     };
-  }, [startCamera]);
+  }, [startCamera, scanQRCode]);
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
@@ -98,20 +149,21 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         sy = (video.videoHeight - sHeight) / 2;
       }
 
-      canvas.width = 1268;
-      canvas.height = 800;
+      // Bump resolution for better AI OCR/QR reading
+      canvas.width = 1600;
+      canvas.height = 1000;
       
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
       context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.9);
       
       const info = await analyzeCCCDImage(base64Image);
       if (info && (info.id || info.name || info.address)) {
         processResult(info);
       } else {
-        alert("AI không thể đọc được. Hãy:\n1. Đưa thẻ lại gần hơn\n2. Giữ thẻ phẳng, không bị lóa đèn\n3. Tránh để ngón tay che mất thông tin trên thẻ.");
+        alert("AI không thể đọc được. Hãy:\n1. Đưa thẻ lại gần hơn\n2. Đảm bảo mã QR hoặc thông tin không bị lóa\n3. Tránh để ngón tay che mất thông tin.");
       }
     } catch (err: any) {
       handleError(err);
@@ -121,7 +173,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   };
 
   const processResult = (result: CCCDAnalysisResult) => {
-    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD') {
+    // Basic validation of result
+    if (!result.id && !result.name) return;
+
+    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD' || result.side === 'ALL') {
       // These cases provide full (or sufficient) info
       onScan(result);
     } else if (result.cardType === 'NEW' && result.side === 'FRONT') {
@@ -256,11 +311,19 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
 
           {!isInitializing && !error && !showBackPrompt && (
             <>
-              <div className="absolute inset-0 pointer-events-none opacity-50 z-0">
-                <div className="absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 border-gold-primary"></div>
-                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 border-gold-primary"></div>
-                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 border-gold-primary"></div>
+              <div className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-300 ${isQRDetected ? 'opacity-100' : 'opacity-40'}`}>
+                <div className={`absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                
+                {isQRDetected && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full animate-pulse border border-green-500/50">
+                      <QrCode className="text-green-500" size={48} />
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="absolute bottom-6 inset-x-0 flex justify-center z-10">
