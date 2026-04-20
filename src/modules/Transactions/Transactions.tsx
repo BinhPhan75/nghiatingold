@@ -62,20 +62,31 @@ const Transactions: React.FC = () => {
 
       if (e.key === 'Enter') {
         const data = scanBuffer.current.trim();
-        if (data.includes('|') && data.split('|').length >= 6) {
+        if (data.length > 5) { // Minimum length for any useful data
           e.preventDefault();
           const info = parseCCCD(data);
+          
           if (info) {
             setCustomerName(info.name);
             setCustomerCCCD(info.id);
             if (info.address) setCustomerAddress(info.address);
-            scanBuffer.current = '';
-            // Optional: visual feedback
+            
+            // Success Feedback
             const notification = document.createElement('div');
-            notification.className = 'fixed bottom-4 right-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4';
-            notification.innerText = 'Đã nhận dạng CCCD từ máy quét';
+            notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
+            notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận dạng ${data.includes('|') ? 'Căn cước' : 'Dữ liệu'} thành công`;
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
+          } else {
+            // If it's just a 12 digit number, maybe it's just the ID part
+            if (/^\d{12}$/.test(data)) {
+              setCustomerCCCD(data);
+              const notification = document.createElement('div');
+              notification.className = 'fixed bottom-4 left-4 bg-ink text-paper px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 border-l-4 border-blue-400';
+              notification.innerText = 'Đã nhận nhanh Số thẻ / CCCD';
+              document.body.appendChild(notification);
+              setTimeout(() => notification.remove(), 2500);
+            }
           }
         }
         scanBuffer.current = '';

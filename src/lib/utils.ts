@@ -16,20 +16,28 @@ export const parseCCCD = (qrData: string): CCCDInfo | null => {
     // Basic hygiene: remove potential whitespace and non-printable characters
     const cleanData = qrData.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, "");
     
-    // Vietnamese CCCD format usually uses '|' as separator. 
+    // Vietnamese CCCD format usually uses '|' as separator.
+    // Standard: NUMBER|OLD_NUMBER|NAME|DOB|GENDER|ADDRESS|ISSUE_DATE
     let parts = cleanData.split('|');
     
-    // If fewer than 6 parts, it's likely not a valid CCCD format we recognize.
-    if (parts.length < 6) {
-      console.warn("QR Data format unrecognized. Expected at least 6 parts, got:", parts.length);
+    // We need at least the ID and Name. 
+    // Usually part 0 is ID, part 2 is Name.
+    if (parts.length < 3) {
+      console.warn("QR Data format too short:", parts.length);
       return null;
     }
 
-    // Ensure we don't return empty values
     const cccdId = parts[0]?.trim();
+    // In newer cards (Căn cước), if they don't have an old ID, parts[1] might be empty.
+    // The format still follows the pipe structure.
     const cccdName = parts[2]?.trim();
     
     if (!cccdId || !cccdName) return null;
+
+    // Check if ID is likely a 12-digit number (standard)
+    if (!/^\d{12}$/.test(cccdId)) {
+      console.warn("Extracted ID does not look like a 12-digit CCCD:", cccdId);
+    }
 
     return {
       id: cccdId,
