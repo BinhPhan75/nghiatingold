@@ -21,27 +21,31 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
   useEffect(() => {
     const startScanner = async () => {
       try {
+        console.log("Initializing Scanner...");
         const html5QrCode = new Html5Qrcode('reader');
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 30, 
-          qrbox: { width: 320, height: 320 },
-          aspectRatio: 1.0,
-          formatsToSupport: [ 
-            Html5QrcodeSupportedFormats.QR_CODE, 
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.AZTEC
-          ]
+          fps: 20, 
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const boxSize = Math.floor(minEdge * 0.7);
+            return { width: boxSize, height: boxSize };
+          },
+          aspectRatio: 4/3,
+          videoConstraints: {
+            facingMode: "environment"
+          }
         };
 
         await html5QrCode.start(
           { facingMode: "environment" }, 
           config, 
           (decodedText) => {
+            console.log("Data Scanned:", decodedText);
             if (!paused && !isProcessing) {
+              // Haptic feedback
+              if (navigator.vibrate) navigator.vibrate(50);
               onScan(decodedText);
             }
           },
@@ -49,9 +53,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         );
         setIsInitializing(false);
       } catch (err: any) {
-        console.error("Camera start error:", err);
-        setError("Không thể truy cập máy ảnh trực tiếp. Vui lòng sử dụng tính năng 'Tải ảnh lên'.");
-        setIsInitializing(false);
+        console.error("Scanner error:", err);
+        setError("Chưa bật camera hoặc lỗi: " + (err.message || String(err)));
+        setIsInitializing(true); // Keep initializing state to show simple error or trial
       }
     };
 
@@ -155,8 +159,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
           </button>
         </div>
         
-        <div className="relative aspect-square bg-black overflow-hidden shadow-inner">
-          <div id="reader" className="w-full h-full"></div>
+        <div className="relative aspect-[4/3] bg-black overflow-hidden shadow-inner">
+          <div id="reader" className="w-full h-full [&>video]:object-cover"></div>
           
           {(isInitializing || isScanningFile || isProcessing) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/60 backdrop-blur-sm z-10">
