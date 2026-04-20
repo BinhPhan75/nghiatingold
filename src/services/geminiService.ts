@@ -22,17 +22,11 @@ export interface CCCDAnalysisResult extends CCCDInfo {
     const client = getAI();
     
     const response = await client.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       contents: [
         {
           parts: [
-            { text: `NHIỆM VỤ: Trích xuất thông tin từ ảnh thẻ Căn cước Việt Nam.
-                     YÊU CẦU:
-                     - name: Họ tên In hoa có dấu.
-                     - id: Số ID (12 số hoặc 9 số).
-                     - dob: Ngày sinh.
-                     - address: Nơi thường trú hoặc Quê quán.
-                     - Trả về JSON, không giải thích.` },
+            { text: "Extract: id, name (UPPERCASE), dob (DD/MM/YYYY), address from this Vietnam ID card. Output JSON only." },
             {
               inlineData: {
                 mimeType: "image/jpeg",
@@ -54,8 +48,7 @@ export interface CCCDAnalysisResult extends CCCDInfo {
             dob: { type: Type.STRING },
             address: { type: Type.STRING },
             cardType: { type: Type.STRING, enum: ["OLD", "NEW", "ELECTRONIC"], default: "OLD" },
-            side: { type: Type.STRING, enum: ["FRONT", "BACK", "ALL"], default: "FRONT" },
-            gender: { type: Type.STRING }
+            side: { type: Type.STRING, enum: ["FRONT", "BACK", "ALL"], default: "FRONT" }
           }
         }
       }

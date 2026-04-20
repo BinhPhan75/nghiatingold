@@ -213,11 +213,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
         sy = (video.videoHeight - sHeight) / 2;
       }
 
-      canvas.width = 1600;
-      canvas.height = 1000;
-      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1600, 1000);
+      canvas.width = 1024;
+      canvas.height = 646;
+      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1024, 646);
 
-      const base64Image = canvas.toDataURL('image/jpeg', 0.9);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
       const info = await analyzeCCCDImage(base64Image);
       
       if (info) {
