@@ -35,6 +35,13 @@ body {
   
   --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, monospace;
+
+  @keyframes scanLine {
+    0% { top: 10%; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: 90%; opacity: 0; }
+  }
 }
 
 @layer base {

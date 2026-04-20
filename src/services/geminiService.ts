@@ -34,16 +34,19 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysi
         text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
 
 PHÂN LOẠI THẺ VÀ QUY TRÌNH:
-1. "OCR MODE" (CCCD cũ / Điện tử): Tập trung đọc CHỮ trên mặt trước. Trích xuất: ID (12 số), Họ tên, Ngày sinh, Địa chỉ (Thường trú/Nơi ở).
-2. "QR MODE" (Căn cước gắn chip mới): Ưu tiên giải mã MÃ QR (thường ở mặt sau). Nếu thấy mã QR, hãy lấy dữ liệu từ đó vì nó chính xác nhất.
+1. "OCR MODE" (CCCD Cũ/Mã vạch - Mặt trước): Tập trung đọc CHỮ in trên thẻ. Trích xuất: ID (12 số), Họ tên (VIẾT HOA), Ngày sinh, Quê quán, Nơi thường trú (lưu vào address). Đặc điểm: Thẻ này KHÔNG có chip, KHÔNG có mã QR mặt trước.
+2. "QR MODE" (CCCD Gắn chip - Mặt sau): Đây là định dạng chuẩn nhất. Ưu tiên giải mã chuỗi text từ MÃ QR. 
 
-QUY TẮC TRỨNG QUANG (OCR):
-- Văn bản thẻ cũ có thể mờ, hãy cố gắng suy luận từ ngữ cảnh.
-- VNeID: Đọc thông tin hiển thị trên màn hình ứng dụng điện thoại.
+QUY TẮC TRÍCH XUẤT OCR (THẺ CŨ - MẶT TRƯỚC):
+- Số / No: -> id
+- Họ và tên / Full name: -> name (Chuyển về chữ IN HOA có dấu)
+- Ngày, tháng, năm sinh / Date of birth: -> dob
+- Nơi thường trú / Place of residence: -> address
+- Nếu ảnh mờ, hãy phân tích các nét chữ còn sót lại để đoán từ chính xác nhất (ví dụ: "Thanh Hoá", "Nghệ An"...).
 
 QUY TẮC TRÍCH XUẤT QR:
 Dữ liệu từ QR có dạng: [ID]|[Số_cũ]|[HỌ_TÊN]|[Ngày_sinh]|[Giới_tính]|[Địa_chỉ]|[Ngày_cấp]
-=> Nếu thấy chuỗi text này hoặc mã QR, 100% dữ liệu phải lấy từ đây.
+=> Nếu nhận diện được định dạng này, bỏ qua mọi kết quả OCR khác và lấy 100% từ đây.
 
 KIỂM TRA DỮ LIỆU (VALIDATION):
    - id: Luôn là 12 chữ số.
@@ -66,18 +69,27 @@ TRẢ VỀ JSON: Chỉ trả về JSON duy nhất. KHÔNG GIẢI THÍCH.`
     const resultText = result.response.text();
     if (!resultText) return null;
 
-    const parsed = JSON.parse(resultText.trim());
-    console.log("AI Analysis Result:", parsed);
+    // Robust JSON extraction from potential markdown blocks
+    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : resultText.trim();
+    
+    try {
+      const parsed = JSON.parse(jsonStr);
+      console.log("AI Analysis Result:", parsed);
 
-    return {
-      id: (parsed.id || '').replace(/\s/g, ''),
-      name: (parsed.name || '').toUpperCase(),
-      dob: parsed.dob || '',
-      gender: parsed.gender || '',
-      address: parsed.address || '',
-      cardType: parsed.cardType || 'OLD',
-      side: parsed.side || 'FRONT'
-    };
+      return {
+        id: (parsed.id || '').replace(/\s/g, ''),
+        name: (parsed.name || '').toUpperCase(),
+        dob: parsed.dob || '',
+        gender: parsed.gender || '',
+        address: parsed.address || '',
+        cardType: parsed.cardType || 'OLD',
+        side: parsed.side || 'FRONT'
+      };
+    } catch (e) {
+      console.error("AI returned invalid JSON:", resultText);
+      throw new Error("Dữ liệu trả về từ AI không hợp lệ. Vui lòng thử lại.");
+    }
   } catch (error: any) {
     console.error("AI Analysis Error (Client):", error);
     throw error;

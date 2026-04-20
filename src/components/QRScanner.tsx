@@ -135,7 +135,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     }
 
     const now = Date.now();
-    if (now - lastScanTime.current < 400) { 
+    if (now - lastScanTime.current < 200) { // Zalo speed: 5 times per second
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
@@ -156,23 +156,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
           const jsqrFunc = (jsQR as any).default || jsQR;
           const code = jsqrFunc(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
-          if (code && code.data) {
+          if (code && code.data && code.data.includes('|')) {
             setIsQRDetected(true);
-            if (detectionTimeout.current) clearTimeout(detectionTimeout.current);
-            detectionTimeout.current = setTimeout(() => setIsQRDetected(false), 3000); // Stable hold for 3s
-
-            const parsed = parseCCCD(code.data);
-            if (parsed && parsed.id) {
-              isScanningActive.current = false;
-              // Visual confirmation delay
-              setTimeout(() => onScan(code.data), 800);
-              return;
-            }
+            isScanningActive.current = false;
+            // Immediate visual success, then callback
+            setTimeout(() => onScan(code.data), 400);
+            return;
           }
         }
       }
     } catch (e) { 
-      console.error("QR Scan Error:", e);
+      console.error("QR Scan Loop Error:", e);
     }
     requestRef.current = requestAnimationFrame(scanQRCode);
   }, [mode, isProcessing, isInitializing, showBackPrompt, onScan]);
@@ -348,43 +342,52 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
 
           {!isInitializing && !error && !showBackPrompt && (
             <>
-              <div className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-300 ${isQRDetected ? 'opacity-100' : 'opacity-40'}`}>
-                <div className={`absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
-                <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+              {/* Static Framing corners - Zalo Style (Consistent, Non-flashing) */}
+              <div className="absolute inset-x-6 top-6 bottom-6 pointer-events-none z-10">
+                <div className={`absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 ${mode === 'qr' ? 'border-white' : 'border-gold-primary'} rounded-tl-sm`}></div>
+                <div className={`absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 ${mode === 'qr' ? 'border-white' : 'border-gold-primary'} rounded-tr-sm`}></div>
+                <div className={`absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 ${mode === 'qr' ? 'border-white' : 'border-gold-primary'} rounded-bl-sm`}></div>
+                <div className={`absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 ${mode === 'qr' ? 'border-white' : 'border-gold-primary'} rounded-br-sm`}></div>
                 
-                {isQRDetected && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full border border-green-500/50 scale-110 transition-transform duration-500">
-                      <QrCode className="text-green-500" size={48} />
-                    </div>
-                  </div>
-                )}
-                
+                {/* Horizontal Scanning Line (Laser) */}
                 {mode === 'qr' && !isQRDetected && (
-                   <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
-                      <div className="bg-ink/30 px-3 py-1 rounded text-[8px] uppercase font-black tracking-widest text-white/80 border border-white/10 backdrop-blur-sm">
-                        Hãy hướng camera vào Mã QR
-                      </div>
-                   </div>
+                  <div className="absolute inset-x-2 h-0.5 bg-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.8)] animate-[scanLine_2.5s_infinite_ease-in-out]"></div>
                 )}
               </div>
               
-              <div className="absolute bottom-6 inset-x-0 flex justify-center z-10">
-                <button 
-                  onClick={handleCapture}
-                  disabled={isProcessing}
-                  className="group relative flex items-center justify-center"
-                >
-                  <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-blue-600' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-all`}>
-                    <Camera size={28} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
+              {isQRDetected && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/20 backdrop-blur-sm z-30 animate-in fade-in duration-300">
+                  <div className="bg-white p-6 rounded-full shadow-2xl animate-[bounce_0.5s_ease-in-out]">
+                    <CheckCircle2 size={64} className="text-green-500" />
                   </div>
-                  <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-80 bg-ink/50 px-2 py-0.5 rounded shadow-sm">
-                    {mode === 'qr' ? 'BẤM ĐỂ CHỤP (HOẶC TỰ QUÉT QR)' : 'BẤM ĐỂ CHỤP & PHÂN TÍCH'}
-                  </p>
-                </button>
-              </div>
+                  <p className="mt-4 text-white font-black uppercase tracking-widest text-[12px] bg-ink/60 px-4 py-2 rounded-full backdrop-blur-md">Đã nhận diện QR!</p>
+                </div>
+              )}
+              
+              {!isQRDetected && (
+                <div className="absolute bottom-6 inset-x-0 flex flex-col items-center gap-4 z-20">
+                  {mode === 'qr' && (
+                    <div className="bg-ink/60 px-4 py-1.5 rounded-full text-[9px] uppercase font-black tracking-widest text-white/90 border border-white/20 backdrop-blur-md shadow-lg">
+                      Hướng camera vào Mã QR
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={handleCapture}
+                    disabled={isProcessing}
+                    className="group relative flex items-center justify-center"
+                  >
+                    <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-white/20' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white group-active:scale-95 transition-all`}>
+                      <Camera size={28} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
+                    </div>
+                    {mode === 'ocr' && (
+                       <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-90 bg-ink/70 px-3 py-1 rounded shadow-xl">
+                        CHỤP CCCD CŨ / ĐIỆN TỬ
+                      </p>
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
