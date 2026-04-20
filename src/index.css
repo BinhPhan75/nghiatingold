@@ -4,6 +4,12 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --animate-flash-fast: flash-fast 0.3s ease-out;
+
+  @keyframes flash-fast {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
 }
 
 :root {

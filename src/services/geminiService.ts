@@ -13,7 +13,16 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         {
           parts: [
             {
-              text: "Trích xuất thông tin từ thẻ Căn cước công dân (CCCD) Việt Nam trong hình ảnh này. Trả về định dạng JSON chính xác với các trường: id (số CCCD), name (họ tên), dob (ngày sinh DD/MM/YYYY), gender (Nam/Nữ), address (nơi thường trú). Chỉ trả về JSON, không giải thích thêm."
+              text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp MẶT TRƯỚC thẻ Căn cước công dân (CCCD) Việt Nam.
+LƯU Ý QUAN TRỌNG:
+1. BỎ QUA HOÀN TOÀN mã QR và mã vạch. Chỉ đọc thông tin bằng chữ và số in trên mặt thẻ.
+2. TRƯỜNG DỮ LIỆU:
+   - id: Số thẻ (12 chữ số).
+   - name: Họ tên (Viết hoa toàn bộ, ví dụ: NGUYỄN VĂN A).
+   - dob: Ngày tháng năm sinh (Định dạng: DD/MM/YYYY).
+   - gender: Giới tính (Nam hoặc Nữ).
+   - address: Nơi thường trú (Đầy đủ địa chỉ ghi trên thẻ).
+3. TRẢ VỀ JSON: Chỉ trả về JSON duy nhất, không giải thích thêm. Nếu không thấy trường nào, hãy để trống "".`
             },
             {
               inlineData: {
@@ -34,17 +43,27 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
             dob: { type: Type.STRING },
             gender: { type: Type.STRING },
             address: { type: Type.STRING }
-          },
-          required: ["id", "name"]
+          }
         }
       }
     });
 
-    const result = JSON.parse(response.text || '{}');
-    if (result.id && result.name) {
+    const rawText = response.text || '{}';
+    let jsonStr = rawText;
+    
+    if (rawText.includes('```')) {
+      const match = rawText.match(/```json\n([\s\S]*?)\n```/) || rawText.match(/```\n([\s\S]*?)\n```/);
+      if (match) jsonStr = match[1];
+    }
+
+    const result = JSON.parse(jsonStr.trim());
+    console.log("AI Result:", result);
+
+    // If we have at least ID or Name, we consider it a success
+    if (result.id || result.name) {
       return {
-        id: result.id,
-        name: result.name,
+        id: (result.id || '').replace(/\s/g, ''), // Clean IDs
+        name: (result.name || '').toUpperCase(),   // Standardize names
         dob: result.dob || '',
         gender: result.gender || '',
         address: result.address || ''
