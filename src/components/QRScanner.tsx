@@ -112,7 +112,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       
       context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-      const base64Image = canvas.toDataURL('image/jpeg', 0.9);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85); // Moderate quality for better reliability
       
       // AI Analysis
       const info = await analyzeCCCDImage(base64Image);
@@ -121,9 +121,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       } else {
         alert("AI không thể đọc được. Hãy:\n1. Đưa thẻ lại gần hơn\n2. Giữ thẻ phẳng, không bị lóa đèn\n3. Tránh để ngón tay che mất thông tin trên thẻ.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Capture Analysis Error:", err);
-      alert("Lỗi phần cứng hoặc AI. Vui lòng tải lại trang hoặc dùng tính năng tải ảnh.");
+      if (err?.message?.includes('GEMINI_API_KEY')) {
+        alert("Lỗi cấu hình: Thiếu mã API AI. Vui lòng liên hệ quản trị viên.");
+      } else if (err?.message?.includes('fetch')) {
+        alert("Lỗi kết nối AI: Không thể kết nối tới máy chủ nhận diện. Vui lòng kiểm tra Wifi/4G của bạn.");
+      } else {
+        alert(err?.message || "Lỗi phần cứng hoặc AI. Vui lòng tải lại trang hoặc dùng tính năng tải ảnh.");
+      }
     } finally {
       setIsProcessing(false);
     }
