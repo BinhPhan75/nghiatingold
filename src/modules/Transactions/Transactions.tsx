@@ -194,20 +194,20 @@ const Transactions: React.FC = () => {
     console.log("Dữ liệu quét được:", data);
     
     // Case 1: Data is an object from AI analysis (from Photo upload or Live AI Capture)
-    if (typeof data === 'object' && data.id && data.name) {
-      setCustomerName(data.name);
-      setCustomerCCCD(data.id);
+    if (typeof data === 'object' && (data.id || data.name)) {
+      console.log("AI result detected:", data);
+      if (data.name) setCustomerName(data.name);
+      if (data.id) setCustomerCCCD(data.id);
       
       if (data.address) {
         setCustomerAddress(data.address);
         setIsWaitingForBackScan(false);
         setShowBackScanPrompt(false);
         setShowScanner(false);
-      } else if (data.cardType === 'NEW') {
+      } else if (data.cardType === 'NEW' || !data.address) {
+        // If it's a NEW card or it's just missing address, prompt for back scan
         setIsWaitingForBackScan(true);
         setShowBackScanPrompt(true);
-        // We keep setShowScanner(true) so the scanner modal stays open, 
-        // but we'll overlay the prompt on top of it or inside it.
       } else {
         setIsWaitingForBackScan(false);
         setShowBackScanPrompt(false);

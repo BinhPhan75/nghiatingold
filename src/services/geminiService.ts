@@ -8,12 +8,12 @@ const ai = new GoogleGenAI({
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       contents: [
         {
           parts: [
             {
-              text: "Trích xuất thông tin từ thẻ Căn cước Việt Nam hoặc giao diện Căn cước điện tử (VNeID). Lưu ý: Với Căn cước điện tử, số ID và Họ tên nằm trên hình thẻ, nhưng 'Nơi thường trú' (địa chỉ) thường nằm ở danh sách văn bản phía dưới hình thẻ. Hãy đọc toàn bộ hình ảnh để lấy đủ: id (số thẻ), name (họ tên), dob (ngày sinh), gender (giới tính), address (địa chỉ/nơi thường trú), cardType ('OLD' hoặc 'NEW'). Trả về JSON."
+              text: "Bạn là chuyên gia bốc tách dữ liệu từ Căn cước Việt Nam. Hãy đọc hình ảnh (thẻ vật lý hoặc app VNeID) để trích xuất: id (số CCCD), name (Họ tên), dob (Ngày sinh), gender (Giới tính), address (Địa chỉ/Nơi thường trú), cardType ('OLD' hoặc 'NEW'). Đối với VNeID, địa chỉ nằm ở danh mục văn bản phía dưới hình thẻ. Trả về JSON."
             },
             {
               inlineData: {
@@ -34,22 +34,23 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
             dob: { type: Type.STRING },
             gender: { type: Type.STRING },
             address: { type: Type.STRING },
-            cardType: { type: Type.STRING, enum: ["OLD", "NEW", "UNKNOWN"] }
-          },
-          required: ["id", "name", "cardType"]
+            cardType: { type: Type.STRING }
+          }
         }
       }
     });
 
+    console.log("AI Raw Content:", response.text);
     const result = JSON.parse(response.text || '{}');
-    if (result.id && result.name) {
+    
+    if (result.id || result.name) {
       return {
-        id: result.id,
-        name: result.name,
+        id: result.id || '',
+        name: result.name || '',
         dob: result.dob || '',
         gender: result.gender || '',
         address: result.address || '',
-        cardType: result.cardType
+        cardType: result.cardType as any
       };
     }
     return null;

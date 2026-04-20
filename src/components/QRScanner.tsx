@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, RefreshCw, QrCode, Upload, Zap, Sparkles } from 'lucide-react';
+import { X, Camera, RefreshCw, QrCode, Upload, Zap, Sparkles, XCircle } from 'lucide-react';
 import { analyzeCCCDImage } from '../services/geminiService';
 
 interface QRScannerProps {
@@ -98,7 +98,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
       if (info) {
         onScan(info);
       } else {
-        alert("Không tìm thấy mã QR và AI không thể phân tích được thông tin thẻ. Vui lòng chụp rõ hơn hoặc thử lại.");
+        setError("AI không thể nhận diện được thông tin. Vui lòng chụp rõ nét hơn, đủ ánh sáng và không bị lóa.");
       }
     } catch (err) {
       console.error("Capture Analysis Error:", err);
@@ -161,15 +161,23 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
           )}
 
           {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 text-white bg-red-900/40 backdrop-blur-md">
-              <X className="mb-4 text-red-500" size={48} />
-              <p className="text-xs font-bold leading-relaxed">{error}</p>
-              <button 
-                onClick={() => window.location.reload()}
-                className="mt-6 bg-white text-ink py-2 px-6 font-black uppercase text-[10px] tracking-widest"
-              >
-                Tải lại trang
-              </button>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 text-white bg-red-900/40 backdrop-blur-md z-20">
+              <XCircle className="mb-4 text-red-500" size={48} />
+              <p className="text-xs font-bold leading-relaxed px-4">{error}</p>
+              <div className="flex gap-2 mt-6">
+                <button 
+                  onClick={() => setError(null)}
+                  className="bg-gold-primary text-ink py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:brightness-110 active:scale-95 transition-all"
+                >
+                  Thử lại
+                </button>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="bg-white/10 text-white py-2 px-6 font-black uppercase text-[10px] tracking-widest hover:bg-white/20 transition-all"
+                >
+                  Tải lại trang
+                </button>
+              </div>
             </div>
           )}
 
