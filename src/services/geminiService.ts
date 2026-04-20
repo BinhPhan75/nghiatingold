@@ -34,13 +34,16 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDAnalysi
         text: `NHIỆM VỤ: Trích xuất thông tin CỰC KỲ CHÍNH XÁC từ ảnh chụp thẻ Căn cước công dân (CCCD) Việt Nam hoặc Căn cước điện tử (VNeID).
 
 PHÂN LOẠI THẺ VÀ QUY TRÌNH:
-1. "OLD": (CCCD mã vạch/ko chip) - Ưu tiên OCR (nhận diện chữ) mặt trước. Trích xuất: ID (12 số), Họ tên, Ngày sinh, Quê quán, Địa chỉ thường trú.
-2. "NEW": (Căn cước từ 7/2024) - Mặt trước có Tên/ID. MẶT SAU có Mã QR chứa 100% dữ liệu. Ưu tiên giải mã chuỗi Text từ QR nếu thấy.
-3. "ELECTRONIC": (VNeID) - Đọc mọi thông tin trên màn hình ứng dụng.
+1. "OCR MODE" (CCCD cũ / Điện tử): Tập trung đọc CHỮ trên mặt trước. Trích xuất: ID (12 số), Họ tên, Ngày sinh, Địa chỉ (Thường trú/Nơi ở).
+2. "QR MODE" (Căn cước gắn chip mới): Ưu tiên giải mã MÃ QR (thường ở mặt sau). Nếu thấy mã QR, hãy lấy dữ liệu từ đó vì nó chính xác nhất.
 
-QUY TẮC TRÍCH XUẤT QR (KHI CÓ):
-Dữ liệu chuẩn: [ID]|[Số_cũ]|[HỌ_TÊN]|[Ngày_sinh]|[Giới_tính]|[Địa_chỉ]|[Ngày_cấp]
-=> Nếu là mặt sau thẻ NEW, hãy tìm mã QR để có dữ liệu chính xác nhất.
+QUY TẮC TRỨNG QUANG (OCR):
+- Văn bản thẻ cũ có thể mờ, hãy cố gắng suy luận từ ngữ cảnh.
+- VNeID: Đọc thông tin hiển thị trên màn hình ứng dụng điện thoại.
+
+QUY TẮC TRÍCH XUẤT QR:
+Dữ liệu từ QR có dạng: [ID]|[Số_cũ]|[HỌ_TÊN]|[Ngày_sinh]|[Giới_tính]|[Địa_chỉ]|[Ngày_cấp]
+=> Nếu thấy chuỗi text này hoặc mã QR, 100% dữ liệu phải lấy từ đây.
 
 KIỂM TRA DỮ LIỆU (VALIDATION):
    - id: Luôn là 12 chữ số.

@@ -7,9 +7,10 @@ import { parseCCCD } from '../lib/utils';
 interface QRScannerProps {
   onScan: (data: string | object) => void;
   onClose: () => void;
+  mode?: 'ocr' | 'qr';
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +19,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
   const [isScanningFile, setIsScanningFile] = useState(false);
   const [scannedData, setScannedData] = useState<CCCDAnalysisResult | null>(null);
   const [showBackPrompt, setShowBackPrompt] = useState(false);
+  const [isQRDetected, setIsQRDetected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const requestRef = useRef<number>(0);
+  const isScanningActive = useRef(true);
+  const lastScanTime = useRef(0);
 
   const handleFinishEarly = useCallback(() => {
     if (scannedData) {
@@ -108,15 +114,71 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
     }
   }, []);
 
+  const scanQRCode = useCallback(() => {
+    if (mode !== 'qr' || !isScanningActive.current) return;
+
+    if (!videoRef.current || isProcessing || isInitializing || showBackPrompt) {
+      requestRef.current = requestAnimationFrame(scanQRCode);
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastScanTime.current < 400) { // Scan every 400ms for stability
+      requestRef.current = requestAnimationFrame(scanQRCode);
+      return;
+    }
+    lastScanTime.current = now;
+
+    try {
+      const video = videoRef.current;
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+        if (!scanCanvasRef.current) scanCanvasRef.current = document.createElement('canvas');
+        const canvas = scanCanvasRef.current;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (context) {
+          const scale = 0.5;
+          canvas.width = video.videoWidth * scale;
+          canvas.height = video.videoHeight * scale;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          const jsqrFunc = (jsQR as any).default || jsQR;
+          const code = jsqrFunc(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+          if (code && code.data) {
+            setIsQRDetected(true);
+            const parsed = parseCCCD(code.data);
+            if (parsed && parsed.id) {
+              isScanningActive.current = false;
+              // Add a small delay for user to see the success state
+              setTimeout(() => onScan(code.data), 500);
+              return;
+            }
+          } else {
+            setIsQRDetected(false);
+          }
+        }
+      }
+    } catch (e) { 
+      console.error("QR Scan Error:", e);
+    }
+    requestRef.current = requestAnimationFrame(scanQRCode);
+  }, [mode, isProcessing, isInitializing, showBackPrompt, onScan]);
+
   useEffect(() => {
     startCamera();
+    if (mode === 'qr') {
+      isScanningActive.current = true;
+      requestRef.current = requestAnimationFrame(scanQRCode);
+    }
     return () => {
+      isScanningActive.current = false;
+      cancelAnimationFrame(requestRef.current);
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [startCamera]);
+  }, [startCamera, scanQRCode, mode]);
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
@@ -198,7 +260,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-gold-primary animate-pulse" />
             <h3 className="font-black text-[10px] uppercase tracking-[0.2em] m-0">
-              {showBackPrompt ? 'Quét Mã QR Mặt Sau' : 'Quét thông tin CCCD AI'}
+              {showBackPrompt ? 'Quét Mã QR Mặt Sau' : mode === 'qr' ? 'Quét Mã QR CCCD Chip' : 'Chụp CCCD Cũ / Điện tử'}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -272,11 +334,27 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
 
           {!isInitializing && !error && !showBackPrompt && (
             <>
-              <div className="absolute inset-0 pointer-events-none z-0 opacity-40">
-                <div className="absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 border-gold-primary transition-all"></div>
-                <div className="absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 border-gold-primary transition-all"></div>
-                <div className="absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 border-gold-primary transition-all"></div>
-                <div className="absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 border-gold-primary transition-all"></div>
+              <div className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-300 ${isQRDetected ? 'opacity-100' : 'opacity-40'}`}>
+                <div className={`absolute top-4 left-4 w-12 h-12 border-t-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute top-4 right-4 w-12 h-12 border-t-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute bottom-4 left-4 w-12 h-12 border-b-4 border-l-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                <div className={`absolute bottom-4 right-4 w-12 h-12 border-b-4 border-r-4 ${isQRDetected ? 'border-green-500 scale-110' : 'border-gold-primary'} transition-all`}></div>
+                
+                {isQRDetected && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-green-500/20 backdrop-blur-[2px] p-4 rounded-full animate-pulse border border-green-500/50">
+                      <QrCode className="text-green-500" size={48} />
+                    </div>
+                  </div>
+                )}
+                
+                {mode === 'qr' && !isQRDetected && (
+                   <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
+                      <div className="bg-ink/30 px-3 py-1 rounded text-[8px] uppercase font-black tracking-widest text-white/80 border border-white/10 backdrop-blur-sm">
+                        Hãy hướng camera vào Mã QR
+                      </div>
+                   </div>
+                )}
               </div>
               
               <div className="absolute bottom-6 inset-x-0 flex justify-center z-10">
@@ -285,12 +363,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
                   disabled={isProcessing}
                   className="group relative flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 bg-gold-primary/20 rounded-full scale-125 blur-md animate-pulse"></div>
-                  <div className="w-16 h-16 bg-gold-primary rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-transform">
-                    <Camera size={28} className="text-ink" />
+                  <div className={`absolute inset-0 ${mode === 'qr' ? 'bg-blue-400/20' : 'bg-gold-primary/20'} rounded-full scale-125 blur-md animate-pulse`}></div>
+                  <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-blue-600' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-paper group-active:scale-90 transition-transform`}>
+                    <Camera size={28} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
                   </div>
                   <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-80 bg-ink/50 px-2 py-0.5 rounded shadow-sm">
-                    {scannedData ? 'CHỤP MÃ QR MẶT SAU' : 'CHỤP MẶT TRƯỚC'}
+                    {mode === 'qr' ? 'BẤM ĐỂ CHỤP (HOẶC TỰ QUÉT QR)' : 'BẤM ĐỂ CHỤP & PHÂN TÍCH'}
                   </p>
                 </button>
               </div>
@@ -304,6 +382,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
               <p className="text-[9px] text-ink font-bold leading-tight max-w-[200px]">
                 {error ? 'Bạn có thể chọn tải ảnh chụp sẵn từ thư viện nếu không thể mở camera.' : 
                  showBackPrompt ? 'Vui lòng lật mặt sau và chụp Mã QR để lấy đủ thông tin.' : 
+                 mode === 'qr' ? 'Hướng camera vào mã QR ở mặt sau thẻ để trích xuất 100% dữ liệu nhanh nhất.' :
                  'Giữ thẻ phẳng, đủ ánh sáng và tránh bị lóa đèn để AI nhận diện tốt nhất.'}
               </p>
               <div className="flex gap-2">

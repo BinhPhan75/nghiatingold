@@ -40,6 +40,7 @@ const Transactions: React.FC = () => {
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
+  const [scannerMode, setScannerMode] = useState<'ocr' | 'qr'>('ocr');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
@@ -397,16 +398,25 @@ const Transactions: React.FC = () => {
         <div className="flex flex-col gap-5">
           <div className="flex justify-between items-end">
             <h3 className="text-2xl m-0">{type === 'SELL' ? 'Khách mua' : 'Mua của khách'}</h3>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
               <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-neutral-100 rounded-sm text-[8px] font-black text-neutral-400 uppercase tracking-tighter" title="Hệ thống tự động nhận diện máy quét cổng USB/Bluetooth">
                 <QrCode size={10} /> Máy quét cầm tay SẴN SÀNG
               </div>
-              <button 
-                onClick={() => setShowScanner(true)}
-                className="flex items-center gap-2 text-[10px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
-              >
-                <Camera size={16} /> Quét CCCD
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setScannerMode('ocr'); setShowScanner(true); }}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
+                >
+                  <Camera size={14} /> Quét CCCD
+                </button>
+                <button 
+                  onClick={() => { setScannerMode('qr'); setShowScanner(true); }}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50"
+                  title="Dành cho Căn cước mẫu mới hoặc VNeID"
+                >
+                  <QrCode size={14} /> Quét QRCODE
+                </button>
+              </div>
             </div>
           </div>
 
@@ -718,6 +728,7 @@ const Transactions: React.FC = () => {
 
       {showScanner && (
         <QRScanner 
+          mode={scannerMode}
           onScan={handleScan} 
           onClose={() => setShowScanner(false)} 
         />
