@@ -40,9 +40,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, paused = false }
         await html5QrCode.start(
           { facingMode: "environment" }, 
           config, 
-          // Disable auto-QR scan for phone camera as per user: 
-          // "phone scan is whole card, not QR"
-          () => {}, 
+          (decodedText) => {
+            if (!paused && !isProcessing) {
+              onScan(decodedText);
+            }
+          },
           () => { }
         );
         setIsInitializing(false);

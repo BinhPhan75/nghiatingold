@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { CCCDInfo } from "../lib/utils";
 
 const ai = new GoogleGenAI({ 
@@ -8,16 +8,14 @@ const ai = new GoogleGenAI({
 export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | null> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-flash-latest",
       contents: [
         {
           parts: [
             {
-              text: "Đọc và bốc tách TOÀN BỘ thông tin từ mặt trước/sau thẻ CCCD Việt Nam hoặc VNeID. " +
-                    "KHÔNG tìm mã QR, chỉ đọc chữ in trên thẻ. " +
-                    "JSON: {id, name, dob, gender, address, cardType: 'OLD'|'NEW'}. " +
-                    "VNeID: lấy địa chỉ bên dưới hình thẻ ảo. " +
-                    "CHỈ TRẢ VỀ JSON."
+              text: "Bốc tách thông tin từ CCCD Việt Nam hoặc VNeID. " +
+                    "Trả về JSON: {id, name, dob, gender, address, cardType: 'OLD'|'NEW'}. " +
+                    "Lấy đầy đủ thông tin từ chữ in trên thẻ. CHỈ TRẢ VỀ JSON."
             },
             {
               inlineData: {
@@ -29,7 +27,6 @@ export const analyzeCCCDImage = async (base64Image: string): Promise<CCCDInfo | 
         }
       ],
       config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
