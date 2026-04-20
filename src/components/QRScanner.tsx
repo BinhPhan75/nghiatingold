@@ -37,15 +37,22 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
     // Basic validation
     if (!result.id && !result.name) return;
 
-    if ((result.cardType === 'NEW' && result.side === 'BACK') || result.cardType === 'ELECTRONIC' || result.cardType === 'OLD' || result.side === 'ALL') {
+    // User Rule: OCR mode only needs 1 side (Front). Finish immediately.
+    if (mode === 'ocr') {
       onScan(result);
-    } else if (result.cardType === 'NEW' && result.side === 'FRONT') {
-      setScannedData(result);
-      setShowBackPrompt(true);
+      return;
+    }
+
+    // QR Mode handles detection via the high-speed loop, but if capture is used:
+    if (result.cardType === 'NEW' && result.side === 'FRONT' && !showBackPrompt) {
+       // Only for NEW cards in specific flows we might prompt, 
+       // but based on user feedback, let's keep it simple.
+       setScannedData(result);
+       setShowBackPrompt(true);
     } else {
       onScan(result);
     }
-  }, [onScan]);
+  }, [onScan, mode, showBackPrompt]);
 
   const startCamera = useCallback(async () => {
     // Basic cleanup before starting
@@ -282,8 +289,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
               <div className="flex flex-col items-center bg-ink/80 p-5 rounded-sm border border-gold-primary/20 shadow-2xl">
                 <Loader2 className="animate-spin mb-3 text-gold-primary" size={24} />
                 <p className="text-[9px] uppercase font-black tracking-widest text-center px-4">
-                  {isScanningFile ? 'Đang phân tích file ảnh...' : 'AI đang xử lý thông tin...'}
+                  {isScanningFile ? 'Đang phân tích file ảnh...' : mode === 'ocr' ? 'AI đang phân tích chữ (OCR)...' : 'AI đang xử lý thông tin...'}
                 </p>
+                <p className="mt-2 text-[7px] text-paper/40 uppercase tracking-tight italic text-center">Vui lòng giữ bảng mạch xử lý ổn định</p>
               </div>
             </div>
           )}
