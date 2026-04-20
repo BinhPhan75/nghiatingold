@@ -24,16 +24,20 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         scannerRef.current = html5QrCode;
 
         const config = { 
-          fps: 20, 
-          qrbox: { width: 320, height: 200 }, // Card shaped box
-          aspectRatio: 1.586 // CCCD standard aspect ratio
+          fps: 15, 
+          qrbox: { width: 300, height: 300 }, // Square box is more stable for autofocus on many devices
+          aspectRatio: 1.0
         };
 
         await html5QrCode.start(
-          { facingMode: "environment" }, 
+          { 
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 } 
+          }, 
           config, 
           (decodedText) => {
-            // Even if it scans a QR, we accept it, but we don't focus on it in the UI
+            // Priority 1: QR code scanning (Machine readable)
             onScan(decodedText);
           },
           (errorMessage) => { }
@@ -81,17 +85,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
       ctx.drawImage(video, 0, 0);
       const base64Image = canvas.toDataURL('image/jpeg', 0.8);
 
-      // 1. Try QR first on this frame
-      try {
-        const qrResult = await scannerRef.current.scanFile(new File([await (await fetch(base64Image)).blob()], "capture.jpg"), true);
-        onScan(qrResult);
-        setIsProcessing(false);
-        return;
-      } catch (e) {
-        // No QR found in frame, move to AI
-      }
-
-      // 2. AI Analysis
+      // Use the direct base64 from canvas - no need to fetch and convert to file for scanFile
+      // if we're mostly relying on AI for the "Face Scan" anyway.
+      
+      // AI Analysis - High priority for the "face scan" request
       const info = await analyzeCCCDImage(base64Image);
       if (info) {
         onScan(info);
@@ -139,14 +136,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         <div className="p-4 border-b flex justify-between items-center bg-ink text-paper text-sm">
           <div className="flex items-center gap-2">
             <Camera size={18} className="text-gold-primary" />
-            <h3 className="font-black text-xs uppercase tracking-[0.2em] m-0">Máy Quét CCCD AI</h3>
+            <h3 className="font-black text-[10px] uppercase tracking-[0.2em] m-0">Quét thông tin CCCD AI</h3>
           </div>
           <button onClick={onClose} className="hover:text-gold-primary transition-colors p-1">
             <X size={24} />
           </button>
         </div>
         
-        <div className="relative aspect-[1.586/1] bg-black overflow-hidden shadow-inner border-y border-gold-primary/20">
+        <div className="relative aspect-square bg-black overflow-hidden shadow-inner border-y border-gold-primary/20">
           <div id="reader" className="w-full h-full"></div>
           
           {(isInitializing || isScanningFile || isProcessing) && (
