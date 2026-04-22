@@ -472,23 +472,24 @@ const Transactions: React.FC = () => {
         <div className="flex flex-col gap-5">
           <div className="flex justify-between items-end">
             <h3 className="text-2xl m-0">{type === 'SELL' ? 'Khách mua' : 'Mua của khách'}</h3>
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
-              <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-neutral-100 rounded-sm text-[8px] font-black text-neutral-400 uppercase tracking-tighter" title="Hệ thống tự động nhận diện máy quét cổng USB/Bluetooth">
-                <QrCode size={10} /> Máy quét cầm tay SẴN SÀNG
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded border border-green-100 text-[8px] md:text-[9px] font-extrabold text-green-700 uppercase tracking-widest animate-pulse" title="Hệ thống đang lắng nghe dữ liệu từ máy quét Bluetooth/USB">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                <QrCode size={12} /> Máy quét cầm tay: Đang hoạt động
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full md:w-auto">
                 <button 
                   onClick={() => { setScannerTarget('cccd'); setScannerMode('ocr'); setShowScanner(true); }}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all rounded-sm"
                 >
-                  <Camera size={14} /> Quét CCCD
+                  <Camera size={14} /> Chụp CCCD
                 </button>
                 <button 
                   onClick={() => { setScannerTarget('cccd'); setScannerMode('qr'); setShowScanner(true); }}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50 rounded-sm"
                   title="Dành cho Căn cước mẫu mới hoặc VNeID"
                 >
-                  <QrCode size={14} /> Quét QRCODE
+                  <QrCode size={14} /> Quét Camera
                 </button>
               </div>
             </div>
