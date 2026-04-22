@@ -26,7 +26,13 @@ export interface CCCDAnalysisResult extends CCCDInfo {
       contents: [
         {
           parts: [
-            { text: "Extract: id, name (UPPERCASE), dob (DD/MM/YYYY), address from this Vietnam ID card. Output JSON only." },
+            { text: `Extract info from Vietnam ID Card (CCCD or older CMND). 
+                     Labels mapping: 
+                     - id: trích xuất từ nhãn "Số" hoặc "No." (có thể 9 hoặc 12 số)
+                     - name: trích xuất từ nhãn "Họ và tên" hoặc "Full name"
+                     - dob: trích xuất từ nhãn "Ngày sinh" hoặc "Date of birth"
+                     - address: trích xuất từ nhãn "Nơi thường trú" (ưu tiên) hoặc "Quê quán".
+                     Return JSON format: {id, name, dob, address, cardType, side}.` },
             {
               inlineData: {
                 mimeType: "image/jpeg",
@@ -41,7 +47,7 @@ export interface CCCDAnalysisResult extends CCCDInfo {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
-          required: ["id", "name", "dob", "address"],
+          required: ["id", "name"],
           properties: {
             id: { type: Type.STRING },
             name: { type: Type.STRING },
@@ -57,16 +63,25 @@ export interface CCCDAnalysisResult extends CCCDInfo {
     const resultText = response.text;
     if (!resultText) return null;
 
-    const parsed = JSON.parse(resultText);
-    return {
-      id: (parsed.id || '').replace(/\s/g, ''),
-      name: (parsed.name || '').toUpperCase(),
-      dob: parsed.dob || '',
-      gender: parsed.gender || '',
-      address: parsed.address || '',
-      cardType: parsed.cardType || 'OLD',
-      side: parsed.side || 'FRONT'
-    };
+    // Robust JSON extraction from potential markdown blocks
+    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : resultText.trim();
+    
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return {
+        id: (parsed.id || '').replace(/\s/g, ''),
+        name: (parsed.name || '').toUpperCase(),
+        dob: parsed.dob || '',
+        gender: parsed.gender || '',
+        address: parsed.address || '',
+        cardType: parsed.cardType || 'OLD',
+        side: parsed.side || 'FRONT'
+      };
+    } catch (e) {
+      console.error("AI returned invalid JSON:", resultText);
+      return null;
+    }
   } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
     throw error;

@@ -263,9 +263,9 @@ const Transactions: React.FC = () => {
         type,
         customer_name: customerName,
         customer_cccd: customerCCCD,
-        dia_chi: customerAddress,
-        customer_bank_id: type === 'BUY' ? customerBankId : undefined,
-        customer_account_no: type === 'BUY' ? customerAccountNo : undefined,
+        dia_chi: customerAddress || null,
+        customer_bank_id: (type === 'BUY' && customerBankId) ? customerBankId : null,
+        customer_account_no: type === 'BUY' ? customerAccountNo : null,
         product_id: item.product.id,
         product_name: item.product.name,
         quantity: item.quantity,
@@ -276,7 +276,7 @@ const Transactions: React.FC = () => {
         tien_mat: itemCash,
         chuyen_khoan: itemTransfer,
         created_at: new Date().toISOString(),
-        created_by: profile?.id || 'anonymous',
+        created_by: profile?.id && profile.id.length > 20 ? profile.id : null,
       };
     });
 
@@ -288,14 +288,18 @@ const Transactions: React.FC = () => {
       const itemsSummary = cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ');
       
       if (type === 'SELL') {
-        const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${itemsSummary}`);
-        if (config && config.bank_id && config.account_no && config.account_holder) {
-          const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount || totalAmount, desc);
-          setQrUrl(url);
-          setShowQR(true);
+        if (transferAmount > 0) {
+          const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${itemsSummary}`);
+          if (config && config.bank_id && config.account_no && config.account_holder) {
+            const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount, desc);
+            setQrUrl(url);
+            setShowQR(true);
+          } else {
+            alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ để hiển thị mã QR chuyển khoản.");
+            setShowSuccess(true);
+          }
         } else {
-          alert("Lỗi: Thông tin ngân hàng của cửa hàng chưa đầy đủ.");
-          setSubmitting(false);
+          setShowSuccess(true);
         }
       } else {
         // For BUY transactions
@@ -613,7 +617,7 @@ const Transactions: React.FC = () => {
           >
             {submitting ? (
               <><Send className="animate-pulse" size={20} /> ĐANG LƯU HỆ THỐNG...</>
-            ) : type === 'SELL' ? (
+            ) : (type === 'SELL' && transferAmount > 0) ? (
               <><QrCode size={20} /> Tạo mã thanh toán QR</>
             ) : (
               <><CheckCircle2 size={20} /> Xác nhận & Lưu giao dịch</>
@@ -675,7 +679,7 @@ const Transactions: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền {type === 'SELL' ? 'CK' : 'Thanh toán'}</p>
-                  <p className="text-xs font-bold">{formatCurrency(transferAmount || totalAmount)}</p>
+                  <p className="text-xs font-bold">{formatCurrency(transferAmount)}</p>
                 </div>
               </div>
               

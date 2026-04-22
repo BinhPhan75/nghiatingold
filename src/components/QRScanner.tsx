@@ -213,11 +213,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
         sy = (video.videoHeight - sHeight) / 2;
       }
 
-      canvas.width = 1024;
-      canvas.height = 646;
-      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1024, 646);
+      canvas.width = 1200;
+      canvas.height = 756;
+      context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1200, 756);
 
-      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85);
       const info = await analyzeCCCDImage(base64Image);
       
       if (info) {
@@ -388,13 +388,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
                     disabled={isProcessing}
                     className="group relative flex items-center justify-center"
                   >
-                    <div className={`w-16 h-16 ${mode === 'qr' ? 'bg-white/20' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white group-active:scale-95 transition-all`}>
-                      <Camera size={28} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
+                    <div className={`w-18 h-18 ${mode === 'qr' ? 'bg-white/20' : 'bg-gold-primary'} rounded-full flex items-center justify-center shadow-2xl relative z-10 border-4 border-white group-active:scale-95 transition-all`}>
+                      <Camera size={32} className={mode === 'qr' ? 'text-white' : 'text-ink'} />
                     </div>
                     {mode === 'ocr' && (
-                       <p className="absolute -bottom-8 text-[8px] font-black uppercase tracking-widest text-white whitespace-nowrap opacity-90 bg-ink/70 px-3 py-1 rounded shadow-xl">
-                        CHỤP CCCD CŨ / ĐIỆN TỬ
-                      </p>
+                       <div className="absolute -bottom-14 flex flex-col items-center">
+                         <p className="text-[9px] font-black uppercase tracking-widest text-white whitespace-nowrap bg-ink/70 px-3 py-1.5 rounded shadow-xl mb-1">
+                          NHẤN ĐỂ CHỤP MẶT TRƯỚC
+                        </p>
+                        <p className="text-[7px] font-bold text-gold-primary uppercase tracking-tighter animate-pulse">Giữ thẻ thẳng & đủ sáng</p>
+                       </div>
                     )}
                   </button>
                 </div>
