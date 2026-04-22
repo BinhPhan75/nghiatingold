@@ -131,15 +131,15 @@ export const generateEMVCoQR = (
   amount: number,
   description: string
 ) => {
-  const bid = bankId || '970436';
-  const memo = removeVietnameseTones(description);
-  const name = removeVietnameseTones(accountName);
+  const bid = bankId?.toString() || '970436';
+  const memo = removeVietnameseTones(description).substring(0, 50);
+  const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
 
   // Merchant Account Info (Tag 38)
   const guid = formatTag('00', 'A000000727'); // Napas
-  const bankInfo = formatTag('01', bid);
-  const accNo = formatTag('02', accountNo);
-  const merchantAccount = formatTag('38', guid + bankInfo + accNo);
+  // Beneficiary Info (Sub-tags under 01)
+  const beneficiaryInfo = formatTag('00', bid) + formatTag('01', accountNo);
+  const merchantAccount = formatTag('38', guid + formatTag('01', beneficiaryInfo) + formatTag('02', '01'));
 
   // Transaction Info
   const payload = [
@@ -181,7 +181,7 @@ export const getVCBDeepLink = (
   description: string
 ) => {
   const emvco = generateEMVCoQR(bankId, accountNo, accountName, amount, description);
-  // Using qr.napas.com.vn Universal Link service for v2 payload redirection
+  // Using direct Napas redirector for universal link support
   return `https://qr.napas.com.vn/v2/pay?tag=00&data=${encodeURIComponent(emvco)}`;
 };
 
