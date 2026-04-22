@@ -186,15 +186,23 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
 
     while (currentPos < qrData.length) {
       const tagId = qrData.substr(currentPos, 2);
-      const length = parseInt(qrData.substr(currentPos + 2, 2));
+      const lengthStr = qrData.substr(currentPos + 2, 2);
+      if (!lengthStr || isNaN(parseInt(lengthStr))) break;
+      
+      const length = parseInt(lengthStr);
       const value = qrData.substr(currentPos + 4, length);
       
-      if (tagId === '38') {
-        // Sub-tags in Tag 38
+      const tagNum = parseInt(tagId);
+      // Merchant Account Info is between Tag 26 and 51
+      if (tagNum >= 26 && tagNum <= 51) {
+        // Sub-tags
         let subPos = 0;
         while (subPos < value.length) {
           const subId = value.substr(subPos, 2);
-          const subLen = parseInt(value.substr(subPos + 2, 2));
+          const subLenStr = value.substr(subPos + 2, 2);
+          if (!subLenStr || isNaN(parseInt(subLenStr))) break;
+          
+          const subLen = parseInt(subLenStr);
           const subVal = value.substr(subPos + 4, subLen);
           
           if (subId === '01') bankBin = subVal;
@@ -205,12 +213,15 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
       }
       
       currentPos += 4 + length;
-      // Safety break for checksum tag or end
       if (tagId === '63') break;
     }
 
     if (bankBin && accountNo) {
-      return { bin: bankBin, accountNo };
+      // Some bank apps put extra info in BIN or account No, clean it
+      return { 
+        bin: bankBin.replace(/[^0-9]/g, ''), 
+        accountNo: accountNo.trim() 
+      };
     }
   } catch (e) {
     console.error("Error parsing VietQR", e);

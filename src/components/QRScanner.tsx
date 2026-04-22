@@ -135,7 +135,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr', ti
     }
 
     const now = Date.now();
-    if (now - lastScanTime.current < 250) { 
+    if (now - lastScanTime.current < 200) { 
       requestRef.current = requestAnimationFrame(scanQRCode);
       return;
     }
@@ -148,7 +148,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr', ti
         const canvas = scanCanvasRef.current;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (context) {
-          const scale = 0.5;
+          const scale = 0.7; // Increased scale for better QR density handling
           canvas.width = video.videoWidth * scale;
           canvas.height = video.videoHeight * scale;
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -156,11 +156,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr', ti
           const jsqrFunc = (jsQR as any).default || jsQR;
           const code = jsqrFunc(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
-          if (code && code.data && code.data.includes('|')) {
-            setIsQRDetected(true);
-            isScanningActive.current = false;
-            setTimeout(() => onScan(code.data), 400);
-            return;
+          if (code && code.data) {
+            const data = code.data;
+            // Detect either CCCD (|) or Bank QR (000201)
+            if (data.includes('|') || data.startsWith('000201')) {
+              setIsQRDetected(true);
+              isScanningActive.current = false;
+              setTimeout(() => onScan(data), 400);
+              return;
+            }
           }
         }
       }
