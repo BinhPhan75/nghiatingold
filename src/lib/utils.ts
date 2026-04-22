@@ -65,10 +65,11 @@ export const getVietQRUrl = (
   // 970436 is the BIN for Vietcombank if not provided
   const bid = bankId || '970436';
   const template = 'compact2'; 
+  const roundedAmount = Math.round(amount);
   const encodedDesc = encodeURIComponent(description);
   const encodedName = encodeURIComponent(accountName);
   
-  return `https://img.vietqr.io/image/${bid}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodedDesc}&accountName=${encodedName}`;
+  return `https://img.vietqr.io/image/${bid}-${accountNo}-${template}.png?amount=${roundedAmount}&addInfo=${encodedDesc}&accountName=${encodedName}`;
 };
 
 /**
@@ -92,8 +93,8 @@ export const removeVietnameseTones = (str: string) => {
   // Some system combine marks
   str = str.replace(/\u0300|\u0301|\u0303|\u0309|\u0323/g, ""); // ̀ ́ ̃ ̉ ̣  
   str = str.replace(/\u02C6|\u0306|\u031B/g, ""); // ˆ ̆ ̛  
-  // Remove special characters that might break bank apps
-  return str.replace(/[^a-zA-Z0-9 ]/g, "").toUpperCase();
+  // Remove special characters but keep space, dash, dot and comma for readability
+  return str.replace(/[^a-zA-Z0-9 \-\.,]/g, "").toUpperCase();
 };
 
 /**
@@ -126,11 +127,13 @@ const formatTag = (id: string, value: string): string => {
 export const generateEMVCoQR = (
   bankId: string,
   accountNo: string,
+  accountName: string,
   amount: number,
   description: string
 ) => {
   const bid = bankId || '970436';
   const memo = removeVietnameseTones(description);
+  const name = removeVietnameseTones(accountName);
 
   // Merchant Account Info (Tag 38)
   const guid = formatTag('00', 'A000000727'); // Napas
@@ -143,9 +146,12 @@ export const generateEMVCoQR = (
     formatTag('00', '01'), // Payload Indicator
     formatTag('01', '12'), // Point of Initiation: Dynamic
     merchantAccount,
+    formatTag('52', '0000'), // Merchant Category Code
     formatTag('53', '704'), // Currency: VND
-    formatTag('54', amount.toString()),
+    formatTag('54', Math.round(amount).toString()),
     formatTag('58', 'VN'), // Country code
+    formatTag('59', name), // Merchant Name / Account Holder
+    formatTag('60', 'SAIGON'), // Merchant City
     formatTag('62', formatTag('08', memo)), // Additional data (Memo)
   ].join('');
 
@@ -156,6 +162,13 @@ export const generateEMVCoQR = (
 };
 
 /**
+ * Get QR Image from raw EMVCo string using a standard QR API
+ */
+export const getRawQRUrl = (emvco: string) => {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(emvco)}`;
+};
+
+/**
  * Bank Deep Link / Universal Link Generator
  * Using direct Napas Universal Link (v2/pay) with EMVCo payload
  * This is the gold standard for opening bank apps with pre-filled data.
@@ -163,10 +176,11 @@ export const generateEMVCoQR = (
 export const getVCBDeepLink = (
   bankId: string,
   accountNo: string,
+  accountName: string,
   amount: number,
   description: string
 ) => {
-  const emvco = generateEMVCoQR(bankId, accountNo, amount, description);
+  const emvco = generateEMVCoQR(bankId, accountNo, accountName, amount, description);
   // Using qr.napas.com.vn Universal Link service for v2 payload redirection
   return `https://qr.napas.com.vn/v2/pay?tag=00&data=${encodeURIComponent(emvco)}`;
 };

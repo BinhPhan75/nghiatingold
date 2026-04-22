@@ -5,7 +5,7 @@ import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
-import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR } from '../../lib/utils';
+import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR, generateEMVCoQR, getRawQRUrl } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
@@ -377,13 +377,15 @@ const Transactions: React.FC = () => {
       const { error } = await supabase.from('transactions').insert(transactions);
       if (error) throw error;
       
-      const itemsSummary = cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ');
+      const itemsSummary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
       
       if (type === 'SELL') {
         if (transferAmount > 0) {
-          const desc = removeVietnameseTones(`${customerName} ${customerCCCD} ${itemsSummary}`);
+          const descOrig = `${customerName} ${customerCCCD} CT MUA ${itemsSummary}`;
+          const desc = removeVietnameseTones(descOrig).substring(0, 100);
           if (config && config.bank_id && config.account_no && config.account_holder) {
-            const url = getVietQRUrl(config.bank_id, config.account_no, config.account_holder, transferAmount, desc);
+            const emvco = generateEMVCoQR(config.bank_id, config.account_no, config.account_holder, transferAmount, desc);
+            const url = getRawQRUrl(emvco);
             setQrUrl(url);
             setShowQR(true);
           } else {
@@ -398,8 +400,10 @@ const Transactions: React.FC = () => {
         if (transferAmount > 0 && customerBankId && customerAccountNo) {
           const bank = banks.find(b => b.id === customerBankId);
           if (bank) {
-            const desc = removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${itemsSummary} ${customerName} ${customerCCCD}`);
-            const url = getVietQRUrl(bank.bin, customerAccountNo, customerName, transferAmount, desc);
+            const descOrig = `NGHIATIN TT TIEN MUA ${itemsSummary} ${customerName} ${customerCCCD}`;
+            const desc = removeVietnameseTones(descOrig).substring(0, 100);
+            const emvco = generateEMVCoQR(bank.bin, customerAccountNo, customerName, transferAmount, desc);
+            const url = getRawQRUrl(emvco);
             setQrUrl(url);
             setShowQR(true);
           } else {
@@ -456,8 +460,11 @@ const Transactions: React.FC = () => {
             <p className="font-bold mb-3 text-sm flex items-center gap-2">
               <XCircle size={16} /> CẢNH BÁO LỖI HỆ THỐNG (TRANSACTION ERROR):
             </p>
-            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10">
-              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, null, 2)}</pre>
+            <div className="bg-black/30 p-4 rounded mb-4 border border-white/10 max-h-40 overflow-y-auto">
+              {lastError.message ? (
+                <div className="text-sm font-bold text-red-200 mb-2">{lastError.message}</div>
+              ) : null}
+              <pre className="whitespace-pre-wrap">{JSON.stringify(lastError, Object.getOwnPropertyNames(lastError), 2)}</pre>
             </div>
             <div className="bg-white/10 p-4 rounded text-red-100">
               <p className="font-bold mb-2 uppercase text-[10px] tracking-widest">Hướng dẫn khắc phục:</p>
@@ -845,16 +852,21 @@ const Transactions: React.FC = () => {
                 <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản (Không dấu)</p>
                 <div className="flex justify-between items-center gap-4">
                   <span className="font-mono font-bold text-sm text-ink break-all">
-                    {type === 'SELL' 
-                      ? removeVietnameseTones(`${customerName} ${customerCCCD} ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')}`)
-                      : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')} ${customerName} ${customerCCCD}`)
-                    }
+                    {(() => {
+                      const summary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
+                      const descOrig = type === 'SELL' 
+                        ? `${customerName} ${customerCCCD} CT MUA ${summary}`
+                        : `NGHIATIN TT TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
+                      return removeVietnameseTones(descOrig).substring(0, 100);
+                    })()}
                   </span>
                   <button 
                     onClick={() => {
-                      const desc = type === 'SELL' 
-                        ? removeVietnameseTones(`${customerName} ${customerCCCD} ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')}`)
-                        : removeVietnameseTones(`NGHIA TIN THANH TOAN TIEN MUA ${cart.map(item => `${item.product.name} x ${item.quantity} ${item.product.unit}`).join(', ')} ${customerName} ${customerCCCD}`);
+                      const summary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
+                      const descOrig = type === 'SELL' 
+                        ? `${customerName} ${customerCCCD} CT MUA ${summary}`
+                        : `NGHIATIN TT TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
+                      const desc = removeVietnameseTones(descOrig).substring(0, 100);
                       navigator.clipboard.writeText(desc);
                       alert("Đã sao chép nội dung!");
                     }}
@@ -866,14 +878,27 @@ const Transactions: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 w-full mb-8">
+              <div className="grid grid-cols-2 gap-y-4 gap-x-6 w-full mb-8 border-y border-neutral-100 py-6">
                 <div className="text-left">
                   <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Người nhận</p>
-                  <p className="text-xs font-bold">{type === 'SELL' ? config?.account_holder : customerName}</p>
+                  <p className="text-sm font-bold text-ink leading-tight">{type === 'SELL' ? config?.account_holder : customerName}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền {type === 'SELL' ? 'CK' : 'Thanh toán'}</p>
-                  <p className="text-xs font-bold">{formatCurrency(transferAmount)}</p>
+                  <p className="text-sm font-bold text-ink">{formatCurrency(transferAmount)}</p>
+                </div>
+                <div className="text-left">
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Ngân hàng</p>
+                  <p className="text-xs font-bold text-neutral-600">
+                    {type === 'SELL' 
+                      ? config?.bank_name 
+                      : (banks.find(b => b.id === customerBankId)?.short_name || 'N/A')
+                    }
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tài khoản</p>
+                  <p className="text-xs font-mono font-bold text-neutral-600">{type === 'SELL' ? config?.account_no : customerAccountNo}</p>
                 </div>
               </div>
               

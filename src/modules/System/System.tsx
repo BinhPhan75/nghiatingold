@@ -555,23 +555,47 @@ const System: React.FC = () => {
 
               {config && (
                 <form onSubmit={handleUpdateConfig} className="flex flex-col gap-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="input-field">
-                      <label>Ngân hàng</label>
-                      <input 
-                        type="text" 
-                        value={config.bank_name} 
-                        onChange={e => setConfig({...config, bank_name: e.target.value})}
-                      />
+                      <label>Chọn Ngân hàng (Để lấy mã chuẩn)</label>
+                      <select 
+                        className="w-full p-2 border border-neutral-100 rounded-sm font-medium bg-neutral-50 text-sm h-[42px]"
+                        onChange={(e) => {
+                          const bank = banks.find(b => b.id === e.target.value);
+                          if (bank && config) {
+                            setConfig({
+                              ...config,
+                              bank_name: bank.short_name,
+                              bank_id: bank.bin
+                            });
+                          }
+                        }}
+                      >
+                        <option value="">-- Chọn ngân hàng --</option>
+                        {banks.map(b => (
+                          <option key={b.id} value={b.id}>{b.short_name} - {b.full_name}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="input-field">
-                      <label>Mã Bank (VietQR ID)</label>
-                      <input 
-                        type="text" 
-                        value={config.bank_id} 
-                        placeholder="VCB, ICB, etc."
-                        onChange={e => setConfig({...config, bank_id: e.target.value})}
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="input-field">
+                        <label>Tên hiển thị</label>
+                        <input 
+                          type="text" 
+                          value={config.bank_name} 
+                          onChange={e => setConfig({...config, bank_name: e.target.value})}
+                        />
+                      </div>
+                      <div className="input-field">
+                        <label>Mã VietQR (BIN)</label>
+                        <input 
+                          type="text" 
+                          value={config.bank_id} 
+                          placeholder="970436, etc."
+                          className="font-mono"
+                          onChange={e => setConfig({...config, bank_id: e.target.value})}
+                        />
+                      </div>
                     </div>
                   </div>
 

@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   customer_account_no TEXT,
   tien_mat NUMERIC DEFAULT 0,
   chuyen_khoan NUMERIC DEFAULT 0,
+  chiet_khau NUMERIC DEFAULT 0,
+  other_deduction NUMERIC DEFAULT 0,
+  deduction_note TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id)
 );
