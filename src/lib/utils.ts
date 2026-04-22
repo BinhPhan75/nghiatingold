@@ -117,8 +117,11 @@ const crc16 = (str: string): string => {
 };
 
 const formatTag = (id: string, value: string): string => {
-  const len = value.length.toString().padStart(2, '0');
-  return `${id}${len}${value}`;
+  // EMVCo lengths MUST be 2 digits (max 99). 
+  // Truncate if longer to prevent breaking the overall QR structure.
+  const safeValue = value.substring(0, 99);
+  const len = safeValue.length.toString().padStart(2, '0');
+  return `${id}${len}${safeValue}`;
 };
 
 /**
@@ -134,24 +137,23 @@ export const generateEMVCoQR = (
   const bid = bankId?.toString() || '970436';
   const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
   
-  // Strict cleanup for QR memo: Only A-Z, 0-9 and Space to avoid bank app parsing errors
+  // Format memo: Use only A-Z, 0-9 and spaces.
+  // Truncate to 90 characters to safely fit within Tag 62's 99-char limit.
   const cleanMemo = removeVietnameseTones(description)
     .replace(/[^A-Z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .substring(0, 100);
+    .substring(0, 90);
 
   // Merchant Account Info (Tag 38)
-  const guid = formatTag('00', 'A000000727'); // Napas guid
-  // Beneficiary Info (Sub-tags under 01)
+  const guid = formatTag('00', 'A000000727'); // Napas GUID
   const beneficiaryInfo = formatTag('00', bid) + formatTag('01', accountNo);
-  // Using standard Napas 2.0 structure: GUID + BeneficiaryInfo (No ServiceCode for pure transfer)
-  const merchantAccount = formatTag('38', guid + formatTag('01', beneficiaryInfo));
+  const merchantAccount = formatTag('38', guid + formatTag('01', beneficiaryInfo) + formatTag('02', 'QRIBFTTA'));
 
-  // Transaction Info
+  // Full EMVCo Payload
   const payload = [
     formatTag('00', '01'), // Payload Indicator
-    formatTag('01', '12'), // Point of Initiation: Dynamic
+    formatTag('01', '12'), // Point of Initiation: Dynamic (per-transaction)
     merchantAccount,
     formatTag('52', '0000'), // Merchant Category Code
     formatTag('53', '704'), // Currency: VND
@@ -159,7 +161,7 @@ export const generateEMVCoQR = (
     formatTag('58', 'VN'), // Country code
     formatTag('59', name), // Merchant Name / Account Holder
     formatTag('60', 'SAIGON'), // Merchant City
-    formatTag('62', formatTag('08', cleanMemo)), // Additional data (Memo)
+    formatTag('62', formatTag('08', cleanMemo)), // Additional Data Field
   ].join('');
 
   const finalStr = payload + '6304';

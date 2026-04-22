@@ -377,14 +377,17 @@ const Transactions: React.FC = () => {
       const { error } = await supabase.from('transactions').insert(transactions);
       if (error) throw error;
       
-      const itemsSummary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
-      
+      // Synchronized Memo Content Logic (Matches visual display and bank requirements)
+      const memoSummary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
+      const memoDesc = type === 'SELL' 
+        ? `${customerName} ${customerCCCD} CT MUA ${memoSummary}`
+        : `NGHIA TIN THANH TOAN TIEN MUA ${memoSummary} ${customerName} ${customerCCCD}`;
+      const memoClean = removeVietnameseTones(memoDesc).toUpperCase().substring(0, 95);
+
       if (type === 'SELL') {
         if (transferAmount > 0) {
-          const descOrig = `${customerName} ${customerCCCD} CT MUA ${itemsSummary}`;
-          const desc = removeVietnameseTones(descOrig).substring(0, 100);
           if (config && config.bank_id && config.account_no && config.account_holder) {
-            const emvco = generateEMVCoQR(config.bank_id, config.account_no, config.account_holder, transferAmount, desc);
+            const emvco = generateEMVCoQR(config.bank_id, config.account_no, config.account_holder, transferAmount, memoClean);
             const url = getRawQRUrl(emvco);
             setQrUrl(url);
             setShowQR(true);
@@ -400,9 +403,7 @@ const Transactions: React.FC = () => {
         if (transferAmount > 0 && customerBankId && customerAccountNo) {
           const bank = banks.find(b => b.id === customerBankId);
           if (bank) {
-            const descOrig = `NGHIATIN TT TIEN MUA ${itemsSummary} ${customerName} ${customerCCCD}`;
-            const desc = removeVietnameseTones(descOrig).substring(0, 100);
-            const emvco = generateEMVCoQR(bank.bin, customerAccountNo, customerName, transferAmount, desc);
+            const emvco = generateEMVCoQR(bank.bin, customerAccountNo, customerName, transferAmount, memoClean);
             const url = getRawQRUrl(emvco);
             setQrUrl(url);
             setShowQR(true);
@@ -814,14 +815,20 @@ const Transactions: React.FC = () => {
           <button 
             onClick={handleSubmit}
             disabled={submitting}
-            className={`vcb-btn w-full flex items-center justify-center gap-3 ${type === 'BUY' ? 'bg-ink' : ''} ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`vcb-btn w-full flex items-center justify-center gap-3 ${type === "BUY" ? "bg-ink" : ""} ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             {submitting ? (
-              <><Send className="animate-pulse" size={20} /> ĐANG LƯU HỆ THỐNG...</>
-            ) : (type === 'SELL' && transferAmount > 0) ? (
-              <><QrCode size={20} /> Tạo mã thanh toán QR</>
+              <>
+                <Send className="animate-pulse" size={20} /> ĐANG LƯU HỆ THỐNG...
+              </>
+            ) : type === "SELL" && transferAmount > 0 ? (
+              <>
+                <QrCode size={20} /> Tạo mã thanh toán QR
+              </>
             ) : (
-              <><CheckCircle2 size={20} /> Xác nhận & Lưu giao dịch</>
+              <>
+                <CheckCircle2 size={20} /> Xác nhận & Lưu giao dịch
+              </>
             )}
           </button>
         </div>
@@ -836,77 +843,75 @@ const Transactions: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white p-8 rounded-sm shadow-xl flex flex-col items-center text-center"
+              className="bg-white rounded-sm shadow-2xl w-full max-w-sm overflow-hidden border border-neutral-100 flex flex-col"
             >
-              <h3 className="mb-4">{type === 'SELL' ? 'Mã thanh toán VietQR' : 'QR Thanh toán cho khách'}</h3>
-              <div className="bg-white p-2 border border-neutral-100 shadow-inner mb-6 ring-4 ring-neutral-50">
-                <img 
-                  src={qrUrl} 
-                  alt="VietQR" 
-                  className="w-72 h-auto" 
-                  referrerPolicy="no-referrer" 
-                />
-              </div>
-              
-              <div className="w-full bg-neutral-50 p-4 rounded-sm border border-neutral-100 mb-6 text-left">
-                <p className="text-[10px] uppercase font-black text-neutral-400 mb-2 tracking-widest">Nội dung chuyển khoản (Không dấu)</p>
-                <div className="flex justify-between items-center gap-4">
-                  <span className="font-mono font-bold text-sm text-ink break-all">
+              <div className="p-6 text-center">
+                <h3 className="text-lg font-black uppercase tracking-tighter mb-4 text-ink">
+                  {type === 'SELL' ? 'QR THANH TOAN CHO CUA HANG' : 'QR THANH TOÁN CHO KHÁCH'}
+                </h3>
+                
+                <div className="bg-white p-4 border border-neutral-100 rounded-lg shadow-inner mb-4 inline-block w-full">
+                  <div className="flex justify-center mb-2">
+                    <img src="https://vietqr.net/portal-service/logo-vietqr.png" alt="VietQR" className="h-8" />
+                  </div>
+                  <div className="bg-white p-2">
+                    <img src={qrUrl} alt="VietQR" className="w-56 h-56 mx-auto" referrerPolicy="no-referrer" />
+                  </div>
+                  <div className="flex justify-center items-center mt-3 gap-3 border-t border-dashed pt-3 border-neutral-200">
+                    <img src="https://napas.com.vn/en/images/logo-napas.png" alt="Napas" className="h-4" />
+                    <div className="w-[1px] h-4 bg-neutral-300"></div>
+                    <span className="font-bold text-xs text-blue-800 uppercase italic">
+                      {type === 'SELL' ? (config?.bank_name || 'BANK') : (banks.find(b => b.id === customerBankId)?.short_name || 'BANK')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mb-6 space-y-1">
+                  <p className="text-sm font-bold text-ink uppercase">
+                    {type === 'SELL' ? config?.account_holder : customerName}
+                  </p>
+                  <p className="text-xs font-mono text-neutral-600">
+                    {type === 'SELL' ? config?.account_no : customerAccountNo}
+                  </p>
+                  <p className="text-lg font-black text-ink mt-2">
+                    {formatCurrency(transferAmount)}
+                  </p>
+                </div>
+
+                <div className="bg-neutral-50 p-4 rounded-sm border border-neutral-100 text-left relative">
+                  <p className="text-[9px] font-bold uppercase text-neutral-400 tracking-widest mb-2 leading-none italic">Nội dung chuyển khoản (Không dấu)</p>
+                  <div className="font-mono font-bold text-sm text-ink leading-relaxed break-words pr-8">
                     {(() => {
-                      const summary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
+                      const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
                         ? `${customerName} ${customerCCCD} CT MUA ${summary}`
-                        : `NGHIATIN TT TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
-                      return removeVietnameseTones(descOrig).substring(0, 100);
+                        : `NGHIA TIN THANH TOAN TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
+                      const clean = removeVietnameseTones(descOrig).toUpperCase().substring(0, 95);
+                      return clean;
                     })()}
-                  </span>
+                  </div>
                   <button 
                     onClick={() => {
-                      const summary = cart.map(item => `${item.quantity} ${item.product.name}`).join(', ');
+                      const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
                         ? `${customerName} ${customerCCCD} CT MUA ${summary}`
-                        : `NGHIATIN TT TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
-                      const desc = removeVietnameseTones(descOrig).substring(0, 100);
-                      navigator.clipboard.writeText(desc);
+                        : `NGHIA TIN THANH TOAN TIEN MUA ${summary} ${customerName} ${customerCCCD}`;
+                      const clean = removeVietnameseTones(descOrig).toUpperCase().substring(0, 95);
+                      navigator.clipboard.writeText(clean);
                       alert("Đã sao chép nội dung!");
                     }}
-                    className="shrink-0 p-2 hover:bg-neutral-200 rounded-full transition-colors"
-                    title="Sao chép nội dung"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-neutral-200 rounded-full transition-colors"
                   >
-                    <CreditCard size={14} className="text-neutral-400" />
+                    <CreditCard size={16} className="text-neutral-400" />
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-4 gap-x-6 w-full mb-8 border-y border-neutral-100 py-6">
-                <div className="text-left">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Người nhận</p>
-                  <p className="text-sm font-bold text-ink leading-tight">{type === 'SELL' ? config?.account_holder : customerName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tiền {type === 'SELL' ? 'CK' : 'Thanh toán'}</p>
-                  <p className="text-sm font-bold text-ink">{formatCurrency(transferAmount)}</p>
-                </div>
-                <div className="text-left">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Ngân hàng</p>
-                  <p className="text-xs font-bold text-neutral-600">
-                    {type === 'SELL' 
-                      ? config?.bank_name 
-                      : (banks.find(b => b.id === customerBankId)?.short_name || 'N/A')
-                    }
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] uppercase font-black text-neutral-400 mb-1 tracking-tight">Số tài khoản</p>
-                  <p className="text-xs font-mono font-bold text-neutral-600">{type === 'SELL' ? config?.account_no : customerAccountNo}</p>
-                </div>
-              </div>
-              
               <button 
                 onClick={resetForm} 
-                className="bg-ink text-paper w-full py-4 font-black uppercase text-xs tracking-widest hover:bg-gold-primary hover:text-ink transition-all shadow-lg"
+                className="bg-ink text-paper w-full py-4 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all border-t border-neutral-100"
               >
-                {type === 'SELL' ? 'Xác nhận đã nhận tiền' : 'Xác nhận đã chuyển tiền'}
+                Xác nhận & Đóng
               </button>
             </motion.div>
           ) : showSuccess ? (
