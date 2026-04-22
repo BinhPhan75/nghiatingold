@@ -515,7 +515,7 @@ const Transactions: React.FC = () => {
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50 rounded-sm"
                   title="Dành cho Căn cước mẫu mới hoặc VNeID"
                 >
-                  <QrCode size={14} /> Quét Camera
+                  <QrCode size={14} /> Quét QRCODE
                 </button>
               </div>
             </div>
