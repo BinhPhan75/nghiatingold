@@ -132,14 +132,21 @@ export const generateEMVCoQR = (
   description: string
 ) => {
   const bid = bankId?.toString() || '970436';
-  const memo = removeVietnameseTones(description).substring(0, 50);
   const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
+  
+  // Strict cleanup for QR memo: Only A-Z, 0-9 and Space to avoid bank app parsing errors
+  const cleanMemo = removeVietnameseTones(description)
+    .replace(/[^A-Z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .substring(0, 100);
 
   // Merchant Account Info (Tag 38)
-  const guid = formatTag('00', 'A000000727'); // Napas
+  const guid = formatTag('00', 'A000000727'); // Napas guid
   // Beneficiary Info (Sub-tags under 01)
   const beneficiaryInfo = formatTag('00', bid) + formatTag('01', accountNo);
-  const merchantAccount = formatTag('38', guid + formatTag('01', beneficiaryInfo) + formatTag('02', '01'));
+  // Using standard Napas 2.0 structure: GUID + BeneficiaryInfo (No ServiceCode for pure transfer)
+  const merchantAccount = formatTag('38', guid + formatTag('01', beneficiaryInfo));
 
   // Transaction Info
   const payload = [
@@ -152,7 +159,7 @@ export const generateEMVCoQR = (
     formatTag('58', 'VN'), // Country code
     formatTag('59', name), // Merchant Name / Account Holder
     formatTag('60', 'SAIGON'), // Merchant City
-    formatTag('62', formatTag('08', memo)), // Additional data (Memo)
+    formatTag('62', formatTag('08', cleanMemo)), // Additional data (Memo)
   ].join('');
 
   const finalStr = payload + '6304';
