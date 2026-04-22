@@ -174,6 +174,7 @@ export const getVCBDeepLink = (
 export interface BankInfo {
   bin: string;
   accountNo: string;
+  accountName?: string;
 }
 
 export const parseVietQR = (qrData: string): BankInfo | null => {
@@ -183,6 +184,7 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     let currentPos = 0;
     let bankBin = '';
     let accountNo = '';
+    let accountName = '';
 
     while (currentPos < qrData.length) {
       const tagId = qrData.substr(currentPos, 2);
@@ -192,6 +194,10 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
       const length = parseInt(lengthStr);
       const value = qrData.substr(currentPos + 4, length);
       
+      if (tagId === '59') {
+        accountName = value;
+      }
+
       const tagNum = parseInt(tagId);
       // Merchant Account Info is between Tag 26 and 51
       if (tagNum >= 26 && tagNum <= 51) {
@@ -244,7 +250,8 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     if (bankBin && accountNo) {
       return { 
         bin: bankBin.replace(/[^0-9]/g, ''), 
-        accountNo: accountNo.replace(/[^a-zA-Z0-9]/g, '').trim() 
+        accountNo: accountNo.replace(/[^a-zA-Z0-9]/g, '').trim(),
+        accountName: accountName.trim()
       };
     }
   } catch (e) {

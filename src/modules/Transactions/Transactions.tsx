@@ -24,6 +24,7 @@ const Transactions: React.FC = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerBankId, setCustomerBankId] = useState('');
   const [customerAccountNo, setCustomerAccountNo] = useState('');
+  const [detectedAccountName, setDetectedAccountName] = useState('');
   
   // Cart State
   interface CartItem {
@@ -142,6 +143,12 @@ const Transactions: React.FC = () => {
     }
   }, [selectedProduct, type]);
 
+  useEffect(() => {
+    setCustomerBankId('');
+    setCustomerAccountNo('');
+    setDetectedAccountName('');
+  }, [type]);
+
   const currentPrice = customPrice;
   
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
@@ -209,6 +216,8 @@ const Transactions: React.FC = () => {
       
       if (bankInfo) {
         setCustomerAccountNo(bankInfo.accountNo);
+        setDetectedAccountName(bankInfo.accountName || '');
+        
         // Find matching bank by BIN (Robust matching)
         const matchingBank = banks.find(b => 
           b.bin === bankInfo.bin || 
@@ -361,6 +370,9 @@ const Transactions: React.FC = () => {
     setCustomerName('');
     setCustomerCCCD('');
     setCustomerAddress('');
+    setCustomerBankId('');
+    setCustomerAccountNo('');
+    setDetectedAccountName('');
     setCart([]);
     setQuantity(1);
     setDiscount(0);
@@ -515,9 +527,17 @@ const Transactions: React.FC = () => {
                 <input 
                   type="text" 
                   value={customerAccountNo}
-                  onChange={(e) => setCustomerAccountNo(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerAccountNo(e.target.value);
+                    if (detectedAccountName) setDetectedAccountName('');
+                  }}
                   placeholder="Nhập số tài khoản"
                 />
+                {detectedAccountName && (
+                  <p className="mt-1 text-[9px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                    <CheckCircle2 size={10} className="text-green-500" /> Chủ TK: {detectedAccountName}
+                  </p>
+                )}
               </div>
             </div>
           )}
