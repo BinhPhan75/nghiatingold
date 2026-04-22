@@ -38,6 +38,8 @@ const Transactions: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
+  const [otherDeduction, setOtherDeduction] = useState<number>(0);
+  const [deductionNote, setDeductionNote] = useState('');
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
@@ -190,7 +192,9 @@ const Transactions: React.FC = () => {
   const currentPrice = customPrice;
   
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
-  const totalAmount = type === 'BUY' ? (cartSubtotal + discount) : Math.max(0, cartSubtotal - discount);
+  const totalAmount = type === 'BUY' 
+    ? Math.max(0, cartSubtotal + discount - otherDeduction) 
+    : Math.max(0, cartSubtotal - discount);
 
   useEffect(() => {
     // Default: transferAmount = totalAmount - cashAmount
@@ -322,6 +326,7 @@ const Transactions: React.FC = () => {
     
     // Distribute payment proportionally with rounding adjustment for last item
     let distributedDiscount = 0;
+    let distributedOtherDeduction = 0;
     let distributedCash = 0;
     let distributedTransfer = 0;
 
@@ -333,14 +338,16 @@ const Transactions: React.FC = () => {
       
       // Proportional distribution
       let itemDiscount = isLast ? (discount - distributedDiscount) : Math.round(discount * weight);
+      let itemOtherDeduction = isLast ? (otherDeduction - distributedOtherDeduction) : Math.round(otherDeduction * weight);
       let itemCash = isLast ? (cashAmount - distributedCash) : Math.round(cashAmount * weight);
       let itemTransfer = isLast ? (transferAmount - distributedTransfer) : Math.round(transferAmount * weight);
 
       distributedDiscount += itemDiscount;
+      distributedOtherDeduction += itemOtherDeduction;
       distributedCash += itemCash;
       distributedTransfer += itemTransfer;
 
-      const itemTotal = type === 'BUY' ? (itemSubtotal + itemDiscount) : Math.max(0, itemSubtotal - itemDiscount);
+      const itemTotal = type === 'BUY' ? (itemSubtotal + itemDiscount - itemOtherDeduction) : Math.max(0, itemSubtotal - itemDiscount);
       
       return {
         type,
@@ -417,6 +424,8 @@ const Transactions: React.FC = () => {
     setCart([]);
     setQuantity(1);
     setDiscount(0);
+    setOtherDeduction(0);
+    setDeductionNote('');
     setCashAmount(0);
     setTransferAmount(0);
     setSelectedProduct(null);
@@ -707,7 +716,42 @@ const Transactions: React.FC = () => {
                 )}
               </div>
             </div>
+            
+            {type === 'BUY' && (
+              <div className="input-field animate-in fade-in slide-in-from-top-1">
+                <label>Giảm trừ khác (VND)</label>
+                <div className="relative">
+                  <input 
+                    type="text"
+                    value={formatNumberWithSeparator(otherDeduction)}
+                    className="font-mono font-bold text-red-600 pr-10"
+                    onChange={(e) => setOtherDeduction(parseNumberFromSeparator(e.target.value))}
+                  />
+                  {otherDeduction > 0 && (
+                    <button 
+                      onClick={() => setOtherDeduction(0)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
+
+          {type === 'BUY' && (
+            <div className="input-field animate-in fade-in slide-in-from-top-1 -mt-2">
+              <label>Ghi chú giảm trừ</label>
+              <input 
+                type="text"
+                value={deductionNote}
+                onChange={(e) => setDeductionNote(e.target.value)}
+                placeholder="Lý do giảm trừ (Vd: bù trừ nợ cũ, phí dịch vụ...)"
+                className="italic text-xs bg-neutral-50/50"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-dashed border-neutral-200">
             <div className="input-field">
@@ -741,6 +785,15 @@ const Transactions: React.FC = () => {
               <div className={`flex justify-between items-center italic ${type === 'BUY' ? 'text-blue-500' : 'text-red-400'}`}>
                 <span className="text-[10px] uppercase font-black">{type === 'BUY' ? 'Cộng thêm (+)' : 'Chiết khấu (-)'}</span>
                 <span className="text-lg font-bold">{type === 'BUY' ? '+' : '-'}{formatCurrency(discount)}</span>
+              </div>
+            )}
+            {type === 'BUY' && otherDeduction > 0 && (
+              <div className="flex justify-between items-center text-red-500 italic">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] uppercase font-black">Giảm trừ khác (-)</span>
+                  {deductionNote && <span className="text-[8px] text-neutral-400 not-italic uppercase tracking-widest">{deductionNote}</span>}
+                </div>
+                <span className="text-lg font-bold">-{formatCurrency(otherDeduction)}</span>
               </div>
             )}
             <div className="flex justify-between items-center mt-2 pt-2 border-t border-neutral-50">
@@ -846,6 +899,13 @@ const Transactions: React.FC = () => {
                 <strong>Tiền mặt:</strong> {formatCurrency(cashAmount)}
                 <br />
                 <strong>Chuyển khoản:</strong> {formatCurrency(transferAmount)}
+                {type === 'BUY' && otherDeduction > 0 && (
+                  <>
+                    <br />
+                    <span className="text-red-500"><strong>Giảm trừ khác:</strong> -{formatCurrency(otherDeduction)}</span>
+                    {deductionNote && <span className="text-[10px] text-neutral-400 font-normal italic"> ({deductionNote})</span>}
+                  </>
+                )}
               </p>
               
               <button 
