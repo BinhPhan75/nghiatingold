@@ -235,7 +235,8 @@ const Transactions: React.FC = () => {
         // Notification feedback
         const notification = document.createElement('div');
         notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
-        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận diện STK: ${bankInfo.accountNo} ${matchingBank ? '' : '(Không rõ Ngân hàng)'}`;
+        const nameStatus = bankInfo.accountName ? `[${bankInfo.accountName}]` : '(Không có tên)';
+        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Quét thành công: ${bankInfo.accountNo} ${nameStatus}`;
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 4000);
         return;
@@ -534,8 +535,8 @@ const Transactions: React.FC = () => {
                   placeholder="Nhập số tài khoản"
                 />
                 {detectedAccountName && (
-                  <p className="mt-1 text-[9px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
-                    <CheckCircle2 size={10} className="text-green-500" /> Chủ TK: {detectedAccountName}
+                  <p className="mt-1 text-[10px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1 animate-in fade-in slide-in-from-top-1 bg-neutral-50 p-1 rounded border border-neutral-100">
+                    <CheckCircle2 size={10} className="text-green-600" /> Chủ TK: {detectedAccountName}
                   </p>
                 )}
               </div>

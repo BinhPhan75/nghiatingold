@@ -178,7 +178,9 @@ export interface BankInfo {
 }
 
 export const parseVietQR = (qrData: string): BankInfo | null => {
-  if (!qrData || !qrData.startsWith('000201')) return null;
+  if (!qrData) return null;
+  const data = qrData.trim();
+  if (!data.startsWith('000201')) return null;
 
   try {
     let currentPos = 0;
@@ -186,23 +188,41 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     let accountNo = '';
     let accountName = '';
 
-    while (currentPos < qrData.length) {
-      const tagId = qrData.substr(currentPos, 2);
-      const lengthStr = qrData.substr(currentPos + 2, 2);
+    while (currentPos < data.length) {
+      const tagId = data.substr(currentPos, 2);
+      const lengthStr = data.substr(currentPos + 2, 2);
       if (!lengthStr || isNaN(parseInt(lengthStr))) break;
       
       const length = parseInt(lengthStr);
-      const value = qrData.substr(currentPos + 4, length);
+      if (currentPos + 4 + length > data.length) break;
       
+      const value = data.substr(currentPos + 4, length);
+      console.log(`Tag VietQR [${tagId}] (len:${length}):`, value);
+      
+      // Tag 59: Merchant Name
       if (tagId === '59') {
         accountName = value;
+      }
+      
+      // Tag 62: Additional Data Field (fallback for name if 59 is missing)
+      if (tagId === '62' && !accountName) {
+        let subPos = 0;
+        while (subPos < value.length) {
+          const subId = value.substr(subPos, 2);
+          const subLen = parseInt(value.substr(subPos + 2, 2));
+          const subVal = value.substr(subPos + 4, subLen);
+          // Look for subId 08 (Often Terminal ID or similar but can store name/info)
+          if (subId === '08' && subVal.length > 3) {
+            accountName = subVal;
+          }
+          subPos += 4 + subLen;
+        }
       }
 
       const tagNum = parseInt(tagId);
       // Merchant Account Info is between Tag 26 and 51
       if (tagNum >= 26 && tagNum <= 51) {
-        console.log(`Phân tích Merchant Info (Tag ${tagId}):`, value);
-        // Parse Sub-tags of Tag 26-51
+        // Parse Sub-tags
         let subPos = 0;
         while (subPos < value.length) {
           const subId = value.substr(subPos, 2);
@@ -212,12 +232,8 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
           const subLen = parseInt(subLenStr);
           const subVal = value.substr(subPos + 4, subLen);
           
-          if (subId === '00') {
-            // GUID or similar
-          } else if (subId === '01') {
-            // Often nested or direct BIN
-            // Standard VietQR nesting: SubTag 01 (Value) -> SubSubTag 00=BIN, SubSubTag 01=ACC
-            // checking if value "looks" like a structure (length >= 10 and has 00/01 markers)
+          if (subId === '01') {
+            // Check if nested structure (Standard VietQR)
             if (subVal.length > 10 && (subVal.startsWith('00') || subVal.includes('01'))) {
                let nPos = 0;
                while (nPos < subVal.length) {
@@ -231,11 +247,9 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
                  nPos += 4 + nLen;
                }
             } else {
-              // Direct BIN if no account yet
               if (!bankBin) bankBin = subVal;
             }
           } else if (subId === '02') {
-            // Direct Account Number (fallback if not in nested 01)
             if (!accountNo) accountNo = subVal;
           }
           
