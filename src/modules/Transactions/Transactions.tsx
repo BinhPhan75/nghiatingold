@@ -54,10 +54,26 @@ const Transactions: React.FC = () => {
   const lastKeyTime = React.useRef<number>(0);
   const scanTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  const [scannerStatus, setScannerStatus] = useState<'offline' | 'ready' | 'active'>('offline');
+
   useEffect(() => {
+    const handleFocus = () => {
+      // If we were active, stay active, otherwise we're ready
+      setScannerStatus(prev => prev === 'active' ? 'active' : 'ready');
+    };
+    const handleBlur = () => {
+      setScannerStatus('offline');
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    // Initial check
+    if (document.hasFocus()) setScannerStatus('ready');
+
     const processScanData = (data: string) => {
       if (!data || data.length < 5) return;
       
+      setScannerStatus('active');
       const info = parseCCCD(data);
       const bankInfo = parseVietQR(data);
       
@@ -473,9 +489,18 @@ const Transactions: React.FC = () => {
           <div className="flex justify-between items-end">
             <h3 className="text-2xl m-0">{type === 'SELL' ? 'Khách mua' : 'Mua của khách'}</h3>
             <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded border border-green-100 text-[8px] md:text-[9px] font-extrabold text-green-700 uppercase tracking-widest animate-pulse" title="Hệ thống đang lắng nghe dữ liệu từ máy quét Bluetooth/USB">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                <QrCode size={12} /> Máy quét cầm tay: Đang hoạt động
+              <div className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[8px] md:text-[9px] font-extrabold uppercase tracking-widest transition-all duration-300 ${
+                scannerStatus === 'active' 
+                  ? 'bg-green-50 border-green-200 text-green-700 animate-pulse' 
+                  : scannerStatus === 'ready'
+                    ? 'bg-blue-50 border-blue-100 text-blue-600'
+                    : 'bg-neutral-100 border-neutral-200 text-neutral-400'
+              }`} title={scannerStatus === 'offline' ? 'Vui lòng nhấn vào cửa sổ ứng dụng để kích hoạt máy quét' : 'Hệ thống đang lắng nghe dữ liệu từ máy quét Bluetooth/USB'}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  scannerStatus === 'active' ? 'bg-green-500' : scannerStatus === 'ready' ? 'bg-blue-400' : 'bg-neutral-300'
+                }`}></span>
+                <QrCode size={12} /> 
+                {scannerStatus === 'active' ? 'Máy quét: Đang hoạt động' : scannerStatus === 'ready' ? 'Máy quét: Sẵn sàng' : 'Máy quét: Chưa kết nối'}
               </div>
               <div className="flex gap-2 w-full md:w-auto">
                 <button 
