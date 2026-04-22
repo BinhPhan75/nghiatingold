@@ -41,6 +41,8 @@ export interface Transaction {
   tien_mat: number;
   chuyen_khoan: number;
   chiet_khau: number;
+  other_deduction?: number;
+  deduction_note?: string;
   customer_bank_id?: string;
   customer_account_no?: string;
   created_at: string;

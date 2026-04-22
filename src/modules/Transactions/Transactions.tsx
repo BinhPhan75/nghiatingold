@@ -363,6 +363,8 @@ const Transactions: React.FC = () => {
         price_per_unit: item.pricePerUnit,
         total_amount: itemTotal,
         chiet_khau: itemDiscount,
+        other_deduction: itemOtherDeduction,
+        deduction_note: type === 'BUY' ? deductionNote : null,
         tien_mat: itemCash,
         chuyen_khoan: itemTransfer,
         created_at: new Date().toISOString(),

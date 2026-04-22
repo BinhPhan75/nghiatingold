@@ -131,6 +131,7 @@ const Reports: React.FC = () => {
           existingGroup.tien_mat += (t.tien_mat || 0);
           existingGroup.chuyen_khoan += (t.chuyen_khoan || 0);
           existingGroup.chiet_khau += (t.chiet_khau || 0);
+          existingGroup.other_deduction = (existingGroup.other_deduction || 0) + (t.other_deduction || 0);
         } else {
           grouped.push({
             ...t,
@@ -177,6 +178,8 @@ const Reports: React.FC = () => {
       "Đơn vị",
       "Đơn giá",
       "Tổng tiền",
+      "Giảm trừ",
+      "Ghi chú giảm",
       "Tiền mặt",
       "Chuyển khoản",
       "Nhân viên"
@@ -194,6 +197,8 @@ const Reports: React.FC = () => {
         t.unit,
         t.price_per_unit,
         t.total_amount,
+        t.other_deduction || 0,
+        t.deduction_note || "",
         t.tien_mat || 0,
         t.chuyen_khoan || 0,
         group.salesperson?.full_name || "Hệ thống"
@@ -516,6 +521,15 @@ const Reports: React.FC = () => {
                                   <span className="font-bold">{selectedTransaction.type === 'BUY' ? '+' : '-'}{formatCurrency(item.chiet_khau)}</span>
                                 </div>
                               )}
+                              {selectedTransaction.type === 'BUY' && (item.other_deduction || 0) > 0 && (
+                                <div className="flex justify-between text-xs text-red-500 italic pb-1">
+                                  <div className="flex flex-col">
+                                    <span>Giảm trừ khác (-):</span>
+                                    {item.deduction_note && <span className="text-[8px] text-neutral-400 not-italic uppercase tracking-widest">{item.deduction_note}</span>}
+                                  </div>
+                                  <span className="font-bold">-{formatCurrency(item.other_deduction || 0)}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -529,6 +543,12 @@ const Reports: React.FC = () => {
                           <span className="text-[10px] font-black uppercase text-neutral-400">Tổng cộng</span>
                           <span className="text-2xl font-black text-ink">{formatCurrency(selectedTransaction.total_amount)}</span>
                         </div>
+                        {selectedTransaction.type === 'BUY' && (selectedTransaction.other_deduction || 0) > 0 && (
+                          <div className="flex justify-between items-center text-red-500 italic text-xs -mt-2 mb-2 ornament-border-l pl-2 border-l-2 border-red-100">
+                             <span className="font-bold">Tổng giảm trừ:</span>
+                             <span className="font-black">-{formatCurrency(selectedTransaction.other_deduction || 0)}</span>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                           <div className="bg-orange-50 p-3 border border-orange-100 rounded-sm">
                             <p className="text-[9px] font-black uppercase text-orange-400 mb-1">Tiền mặt</p>
