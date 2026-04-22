@@ -171,6 +171,53 @@ export const getVCBDeepLink = (
   return `https://qr.napas.com.vn/v2/pay?tag=00&data=${encodeURIComponent(emvco)}`;
 };
 
+export interface BankInfo {
+  bin: string;
+  accountNo: string;
+}
+
+export const parseVietQR = (qrData: string): BankInfo | null => {
+  if (!qrData || !qrData.startsWith('000201')) return null;
+
+  try {
+    let currentPos = 0;
+    let bankBin = '';
+    let accountNo = '';
+
+    while (currentPos < qrData.length) {
+      const tagId = qrData.substr(currentPos, 2);
+      const length = parseInt(qrData.substr(currentPos + 2, 2));
+      const value = qrData.substr(currentPos + 4, length);
+      
+      if (tagId === '38') {
+        // Sub-tags in Tag 38
+        let subPos = 0;
+        while (subPos < value.length) {
+          const subId = value.substr(subPos, 2);
+          const subLen = parseInt(value.substr(subPos + 2, 2));
+          const subVal = value.substr(subPos + 4, subLen);
+          
+          if (subId === '01') bankBin = subVal;
+          if (subId === '02') accountNo = subVal;
+          
+          subPos += 4 + subLen;
+        }
+      }
+      
+      currentPos += 4 + length;
+      // Safety break for checksum tag or end
+      if (tagId === '63') break;
+    }
+
+    if (bankBin && accountNo) {
+      return { bin: bankBin, accountNo };
+    }
+  } catch (e) {
+    console.error("Error parsing VietQR", e);
+  }
+  return null;
+};
+
 export const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };

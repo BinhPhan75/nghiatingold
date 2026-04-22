@@ -8,9 +8,10 @@ interface QRScannerProps {
   onScan: (data: string | object) => void;
   onClose: () => void;
   mode?: 'ocr' | 'qr';
+  title?: string;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr', title }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -265,7 +266,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr' }) 
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-gold-primary" />
             <h3 className="font-black text-[10px] uppercase tracking-[0.2em] m-0">
-              {showBackPrompt ? 'Quét Mã QR Mặt Sau' : mode === 'qr' ? 'Quét Mã QR CCCD Chip' : 'Chụp CCCD Cũ / Điện tử'}
+              {title || (showBackPrompt ? 'Quét Mã QR Mặt Sau' : mode === 'qr' ? 'Quét Mã QR CCCD Chip' : 'Chụp CCCD Cũ / Điện tử')}
             </h3>
           </div>
           <div className="flex items-center gap-2">

@@ -5,7 +5,7 @@ import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus } from 'lucide-react';
 import QRScanner from '../../components/QRScanner';
-import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones } from '../../lib/utils';
+import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
@@ -41,6 +41,7 @@ const Transactions: React.FC = () => {
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [showScanner, setShowScanner] = useState(false);
   const [scannerMode, setScannerMode] = useState<'ocr' | 'qr'>('ocr');
+  const [scannerTarget, setScannerTarget] = useState<'cccd' | 'bank'>('cccd');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
@@ -200,6 +201,28 @@ const Transactions: React.FC = () => {
 
     // Case 2: Data is a string from QR scan
     if (typeof data === 'string') {
+      // 2.1: Check if it's a Bank QR (VietQR starts with 000201)
+      const bankInfo = parseVietQR(data);
+      if (bankInfo) {
+        setCustomerAccountNo(bankInfo.accountNo);
+        // Find matching bank by BIN
+        const matchingBank = banks.find(b => b.bin === bankInfo.bin);
+        if (matchingBank) {
+          setCustomerBankId(matchingBank.id);
+        }
+        setShowScanner(false);
+        setLastError(null);
+        
+        // Notification feedback
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
+        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận diện Tài khoản khách`;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+        return;
+      }
+
+      // 2.2: Check if it's a CCCD QR
       const info = parseCCCD(data);
       if (info) {
         setCustomerName(info.name);
@@ -213,7 +236,7 @@ const Transactions: React.FC = () => {
         if (parts.length > 2) {
           alert(`Dữ liệu quét được: "${data.substring(0, 30)}..." không khớp định dạng CCCD chuẩn. Vui lòng thử lại với thẻ CCCD gắn chip mới nhất.`);
         } else {
-          alert("Không nhận diện được nội dung CCCD. Vui lòng đảm bảo bạn đang quét mã QR ở góc trên cùng bên phải của thẻ CCCD gắn chip.");
+          alert("Không nhận diện được nội dung. Vui lòng đảm bảo bạn đang quét đúng Mã QR CCCD hoặc VietQR Ngân hàng.");
         }
       }
     }
@@ -408,13 +431,13 @@ const Transactions: React.FC = () => {
               </div>
               <div className="flex gap-2">
                 <button 
-                  onClick={() => { setScannerMode('ocr'); setShowScanner(true); }}
+                  onClick={() => { setScannerTarget('cccd'); setScannerMode('ocr'); setShowScanner(true); }}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-gold-dark border border-gold-primary/30 py-2 px-3 hover:bg-gold-primary hover:text-ink transition-all"
                 >
                   <Camera size={14} /> Quét CCCD
                 </button>
                 <button 
-                  onClick={() => { setScannerMode('qr'); setShowScanner(true); }}
+                  onClick={() => { setScannerTarget('cccd'); setScannerMode('qr'); setShowScanner(true); }}
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50"
                   title="Dành cho Căn cước mẫu mới hoặc VNeID"
                 >
@@ -470,7 +493,15 @@ const Transactions: React.FC = () => {
                 </select>
               </div>
               <div className="input-field">
-                <label>Số tài khoản khách hàng</label>
+                <label className="flex justify-between items-center">
+                  <span>Số tài khoản khách hàng</span>
+                  <button 
+                    onClick={() => { setScannerTarget('bank'); setScannerMode('qr'); setShowScanner(true); }}
+                    className="text-[8px] font-black uppercase text-blue-600 flex items-center gap-1 hover:underline px-2 py-0.5 bg-blue-50 rounded-full border border-blue-100"
+                  >
+                    <QrCode size={10} /> Quét mã ngân hàng
+                  </button>
+                </label>
                 <input 
                   type="text" 
                   value={customerAccountNo}
@@ -733,6 +764,7 @@ const Transactions: React.FC = () => {
       {showScanner && (
         <QRScanner 
           mode={scannerMode}
+          title={scannerTarget === 'bank' ? 'Quét Mã QR Ngân hàng' : undefined}
           onScan={handleScan} 
           onClose={() => setShowScanner(false)} 
         />
