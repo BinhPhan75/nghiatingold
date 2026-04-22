@@ -195,6 +195,7 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
       const tagNum = parseInt(tagId);
       // Merchant Account Info is between Tag 26 and 51
       if (tagNum >= 26 && tagNum <= 51) {
+        console.log(`Phân tích Merchant Info (Tag ${tagId}):`, value);
         // Parse Sub-tags of Tag 26-51
         let subPos = 0;
         while (subPos < value.length) {
@@ -205,12 +206,13 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
           const subLen = parseInt(subLenStr);
           const subVal = value.substr(subPos + 4, subLen);
           
-          if (subId === '00' && subVal === 'A000000727') {
-            // It's a Napas/VietQR tag
+          if (subId === '00') {
+            // GUID or similar
           } else if (subId === '01') {
-            // Can be BIN or a nested structure (Tag 00=BIN, Tag 01=Acc)
+            // Often nested or direct BIN
+            // Standard VietQR nesting: SubTag 01 (Value) -> SubSubTag 00=BIN, SubSubTag 01=ACC
+            // checking if value "looks" like a structure (length >= 10 and has 00/01 markers)
             if (subVal.length > 10 && (subVal.startsWith('00') || subVal.includes('01'))) {
-               // Try to parse as nested
                let nPos = 0;
                while (nPos < subVal.length) {
                  const nId = subVal.substr(nPos, 2);
@@ -219,14 +221,16 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
                  const nLen = parseInt(nLenStr);
                  const nVal = subVal.substr(nPos + 4, nLen);
                  if (nId === '00') bankBin = nVal;
-                 if (nId === '01') accountNo = nVal;
+                 if (nId === '01' || nId === '02') accountNo = nVal;
                  nPos += 4 + nLen;
                }
             } else {
-              bankBin = subVal;
+              // Direct BIN if no account yet
+              if (!bankBin) bankBin = subVal;
             }
           } else if (subId === '02') {
-            accountNo = subVal;
+            // Direct Account Number (fallback if not in nested 01)
+            if (!accountNo) accountNo = subVal;
           }
           
           subPos += 4 + subLen;
@@ -240,7 +244,7 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     if (bankBin && accountNo) {
       return { 
         bin: bankBin.replace(/[^0-9]/g, ''), 
-        accountNo: accountNo.trim() 
+        accountNo: accountNo.replace(/[^a-zA-Z0-9]/g, '').trim() 
       };
     }
   } catch (e) {
