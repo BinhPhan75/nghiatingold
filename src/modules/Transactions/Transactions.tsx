@@ -190,7 +190,7 @@ const Transactions: React.FC = () => {
   const currentPrice = customPrice;
   
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
-  const totalAmount = Math.max(0, cartSubtotal - discount);
+  const totalAmount = type === 'BUY' ? (cartSubtotal + discount) : Math.max(0, cartSubtotal - discount);
 
   useEffect(() => {
     // Default: transferAmount = totalAmount - cashAmount
@@ -689,7 +689,7 @@ const Transactions: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="input-field">
-              <label>Chiết khấu tổng (VND)</label>
+              <label>{type === 'BUY' ? 'Cộng thêm tiền (VND)' : 'Chiết khấu tổng (VND)'}</label>
               <div className="relative">
                 <input 
                   type="text"
@@ -738,9 +738,9 @@ const Transactions: React.FC = () => {
               <span className="text-lg font-bold">{formatCurrency(cartSubtotal)}</span>
             </div>
             {discount > 0 && (
-              <div className="flex justify-between items-center text-red-400 italic">
-                <span className="text-[10px] uppercase font-black">Chiết khấu (-)</span>
-                <span className="text-lg font-bold">-{formatCurrency(discount)}</span>
+              <div className={`flex justify-between items-center italic ${type === 'BUY' ? 'text-blue-500' : 'text-red-400'}`}>
+                <span className="text-[10px] uppercase font-black">{type === 'BUY' ? 'Cộng thêm (+)' : 'Chiết khấu (-)'}</span>
+                <span className="text-lg font-bold">{type === 'BUY' ? '+' : '-'}{formatCurrency(discount)}</span>
               </div>
             )}
             <div className="flex justify-between items-center mt-2 pt-2 border-t border-neutral-50">
