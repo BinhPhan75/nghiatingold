@@ -511,9 +511,9 @@ const Reports: React.FC = () => {
                                 <span className="font-bold">{formatCurrency(item.price_per_unit * item.quantity)}</span>
                               </div>
                               {item.chiet_khau > 0 && (
-                                <div className="flex justify-between text-xs text-red-500 italic">
-                                  <span>Chiết khấu phân bổ (-):</span>
-                                  <span className="font-bold">-{formatCurrency(item.chiet_khau)}</span>
+                                <div className={`flex justify-between text-xs italic ${selectedTransaction.type === 'BUY' ? 'text-blue-500' : 'text-red-500'}`}>
+                                  <span>{selectedTransaction.type === 'BUY' ? 'Tiền thêm (+):' : 'Chiết khấu (-):'}</span>
+                                  <span className="font-bold">{selectedTransaction.type === 'BUY' ? '+' : '-'}{formatCurrency(item.chiet_khau)}</span>
                                 </div>
                               )}
                             </div>

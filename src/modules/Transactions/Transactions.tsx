@@ -340,7 +340,7 @@ const Transactions: React.FC = () => {
       distributedCash += itemCash;
       distributedTransfer += itemTransfer;
 
-      const itemTotal = itemSubtotal - itemDiscount;
+      const itemTotal = type === 'BUY' ? (itemSubtotal + itemDiscount) : Math.max(0, itemSubtotal - itemDiscount);
       
       return {
         type,
@@ -515,7 +515,7 @@ const Transactions: React.FC = () => {
                   className="flex-1 md:flex-none flex items-center justify-center gap-2 text-[9px] font-black uppercase text-blue-600 border border-blue-200 py-2 px-3 hover:bg-blue-600 hover:text-white transition-all bg-blue-50/50 rounded-sm"
                   title="Dành cho Căn cước mẫu mới hoặc VNeID"
                 >
-                  <QrCode size={14} /> Quét QRCODE
+                  <QrCode size={14} /> Quét Camera
                 </button>
               </div>
             </div>
