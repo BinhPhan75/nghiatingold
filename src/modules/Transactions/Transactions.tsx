@@ -52,57 +52,76 @@ const Transactions: React.FC = () => {
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
   const lastKeyTime = React.useRef<number>(0);
+  const scanTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    const processScanData = (data: string) => {
+      if (!data || data.length < 5) return;
+      
+      const info = parseCCCD(data);
+      const bankInfo = parseVietQR(data);
+      
+      console.log("Processing Global Scan:", data.substring(0, 50));
+      
+      if (info) {
+        setCustomerName(info.name);
+        setCustomerCCCD(info.id);
+        if (info.address) setCustomerAddress(info.address);
+        
+        // Success Feedback
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
+        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận dạng Căn cước thành công`;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      } else if (bankInfo) {
+        handleScan(data);
+      } else if (/^\d{12}$/.test(data)) {
+        setCustomerCCCD(data);
+        const notification = document.createElement('div');
+        notification.className = 'fixed bottom-4 left-4 bg-ink text-paper px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 border-l-4 border-blue-400';
+        notification.innerText = 'Đã nhận nhanh Số thẻ / CCCD';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 2500);
+      }
+    };
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if in diagnostic or specific contexts where we don't want to steal focus
       if (showScanner || showSuccess || showQR) return;
       
-      // Scanners usually send keys very fast (< 30ms)
       const now = Date.now();
-      const isFast = now - lastKeyTime.current < 50;
+      const isFast = (now - lastKeyTime.current < 100); // 100ms threshold for scanners
       lastKeyTime.current = now;
 
+      // Handle scan timeout (for scanners that don't send Enter)
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+      
       if (e.key === 'Enter') {
         const data = scanBuffer.current.trim();
-        if (data.length > 5) { // Minimum length for any useful data
+        if (data) {
           e.preventDefault();
-          const info = parseCCCD(data);
-          const bankInfo = parseVietQR(data);
-          
-          if (info) {
-            setCustomerName(info.name);
-            setCustomerCCCD(info.id);
-            if (info.address) setCustomerAddress(info.address);
-            
-            // Success Feedback
-            const notification = document.createElement('div');
-            notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
-            notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận dạng ${data.includes('|') ? 'Căn cước' : 'Dữ liệu'} thành công`;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 3000);
-          } else if (bankInfo) {
-            handleScan(data);
-          } else {
-            // If it's just a 12 digit number, maybe it's just the ID part
-            if (/^\d{12}$/.test(data)) {
-              setCustomerCCCD(data);
-              const notification = document.createElement('div');
-              notification.className = 'fixed bottom-4 left-4 bg-ink text-paper px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 border-l-4 border-blue-400';
-              notification.innerText = 'Đã nhận nhanh Số thẻ / CCCD';
-              document.body.appendChild(notification);
-              setTimeout(() => notification.remove(), 2500);
-            }
-          }
+          processScanData(data);
         }
         scanBuffer.current = '';
       } else if (e.key.length === 1) {
+        // If it was slow (>100ms) and we already have some data, this is likely manual typing or a new scan
         if (!isFast && scanBuffer.current.length > 0) {
-          // If it was slow, reset buffer because it's manual typing
+          // If we had a significant buffer, process it first if it hasn't been processed by Enter
+          if (scanBuffer.current.length > 10) {
+            processScanData(scanBuffer.current.trim());
+          }
           scanBuffer.current = e.key;
         } else {
           scanBuffer.current += e.key;
         }
+        
+        // Auto-process after delay of inactivity
+        scanTimeoutRef.current = setTimeout(() => {
+          if (scanBuffer.current.length > 5) {
+            processScanData(scanBuffer.current.trim());
+            scanBuffer.current = '';
+          }
+        }, 300); // 300ms of silence means scan is done
       }
     };
 
