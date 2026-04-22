@@ -138,12 +138,12 @@ export const generateEMVCoQR = (
   const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
   
   // Format memo: Use only A-Z, 0-9 and spaces.
-  // Truncate to 90 characters to safely fit within Tag 62's 99-char limit.
+  // Truncate to 75 characters to safely fit within e-wallet limits (like MoMo).
   const cleanMemo = removeVietnameseTones(description)
     .replace(/[^A-Z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .substring(0, 90);
+    .substring(0, 75);
 
   // Merchant Account Info (Tag 38)
   const guid = formatTag('00', 'A000000727'); // Napas GUID
@@ -153,7 +153,7 @@ export const generateEMVCoQR = (
   // Full EMVCo Payload
   const payload = [
     formatTag('00', '01'), // Payload Indicator
-    formatTag('01', '12'), // Point of Initiation: Dynamic (per-transaction)
+    formatTag('01', '11'), // Point of Initiation: 11 (Static) is often more compatible with wallets than 12 (Dynamic)
     merchantAccount,
     formatTag('52', '0000'), // Merchant Category Code
     formatTag('53', '704'), // Currency: VND
@@ -161,7 +161,7 @@ export const generateEMVCoQR = (
     formatTag('58', 'VN'), // Country code
     formatTag('59', name), // Merchant Name / Account Holder
     formatTag('60', 'SAIGON'), // Merchant City
-    formatTag('62', formatTag('08', cleanMemo)), // Additional Data Field
+    formatTag('62', formatTag('08', cleanMemo)), // Additional Data Field (Memo)
   ].join('');
 
   const finalStr = payload + '6304';
