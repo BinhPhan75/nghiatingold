@@ -201,24 +201,34 @@ const Transactions: React.FC = () => {
 
     // Case 2: Data is a string from QR scan
     if (typeof data === 'string') {
+      console.log("Xử lý chuỗi quét:", data.substring(0, 50) + "...");
+      
       // 2.1: Check if it's a Bank QR (VietQR starts with 000201)
       const bankInfo = parseVietQR(data);
+      console.log("Kết quả phân tích VietQR:", bankInfo);
+      
       if (bankInfo) {
         setCustomerAccountNo(bankInfo.accountNo);
-        // Find matching bank by BIN
-        const matchingBank = banks.find(b => b.bin === bankInfo.bin);
+        // Find matching bank by BIN (Robust matching)
+        const matchingBank = banks.find(b => 
+          b.bin === bankInfo.bin || 
+          (bankInfo.bin.length > 6 && b.bin === bankInfo.bin.substring(bankInfo.bin.length - 6)) ||
+          (b.bin.length > 6 && bankInfo.bin === b.bin.substring(b.bin.length - 6))
+        );
+
         if (matchingBank) {
           setCustomerBankId(matchingBank.id);
         }
+        
         setShowScanner(false);
         setLastError(null);
         
         // Notification feedback
         const notification = document.createElement('div');
         notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
-        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận diện Tài khoản khách`;
+        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận diện STK: ${bankInfo.accountNo} ${matchingBank ? '' : '(Không rõ Ngân hàng)'}`;
         document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
+        setTimeout(() => notification.remove(), 4000);
         return;
       }
 

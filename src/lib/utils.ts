@@ -195,7 +195,7 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
       const tagNum = parseInt(tagId);
       // Merchant Account Info is between Tag 26 and 51
       if (tagNum >= 26 && tagNum <= 51) {
-        // Sub-tags
+        // Parse Sub-tags of Tag 26-51
         let subPos = 0;
         while (subPos < value.length) {
           const subId = value.substr(subPos, 2);
@@ -205,8 +205,29 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
           const subLen = parseInt(subLenStr);
           const subVal = value.substr(subPos + 4, subLen);
           
-          if (subId === '01') bankBin = subVal;
-          if (subId === '02') accountNo = subVal;
+          if (subId === '00' && subVal === 'A000000727') {
+            // It's a Napas/VietQR tag
+          } else if (subId === '01') {
+            // Can be BIN or a nested structure (Tag 00=BIN, Tag 01=Acc)
+            if (subVal.length > 10 && (subVal.startsWith('00') || subVal.includes('01'))) {
+               // Try to parse as nested
+               let nPos = 0;
+               while (nPos < subVal.length) {
+                 const nId = subVal.substr(nPos, 2);
+                 const nLenStr = subVal.substr(nPos + 2, 2);
+                 if (!nLenStr || isNaN(parseInt(nLenStr))) break;
+                 const nLen = parseInt(nLenStr);
+                 const nVal = subVal.substr(nPos + 4, nLen);
+                 if (nId === '00') bankBin = nVal;
+                 if (nId === '01') accountNo = nVal;
+                 nPos += 4 + nLen;
+               }
+            } else {
+              bankBin = subVal;
+            }
+          } else if (subId === '02') {
+            accountNo = subVal;
+          }
           
           subPos += 4 + subLen;
         }
@@ -217,7 +238,6 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     }
 
     if (bankBin && accountNo) {
-      // Some bank apps put extra info in BIN or account No, clean it
       return { 
         bin: bankBin.replace(/[^0-9]/g, ''), 
         accountNo: accountNo.trim() 
