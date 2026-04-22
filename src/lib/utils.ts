@@ -191,69 +191,77 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     while (currentPos < data.length) {
       const tagId = data.substr(currentPos, 2);
       const lengthStr = data.substr(currentPos + 2, 2);
-      if (!lengthStr || isNaN(parseInt(lengthStr))) break;
+      if (!lengthStr || lengthStr.length < 2 || isNaN(parseInt(lengthStr))) break;
       
       const length = parseInt(lengthStr);
       if (currentPos + 4 + length > data.length) break;
       
       const value = data.substr(currentPos + 4, length);
-      console.log(`Tag VietQR [${tagId}] (len:${length}):`, value);
       
       // Tag 59: Merchant Name
-      if (tagId === '59') {
-        accountName = value;
+      if ((tagId === '59' || tagId === '54') && value && value.length > 3) {
+        if (!accountName) accountName = value;
       }
       
-      // Tag 62: Additional Data Field (fallback for name if 59 is missing)
-      if (tagId === '62' && !accountName) {
+      const tagNum = parseInt(tagId);
+      // Merchant Account Info
+      if (tagNum >= 26 && tagNum <= 51) {
         let subPos = 0;
-        while (subPos < value.length) {
+        while (subPos + 4 <= value.length) {
           const subId = value.substr(subPos, 2);
-          const subLen = parseInt(value.substr(subPos + 2, 2));
+          const subLenStr = value.substr(subPos + 2, 2);
+          const subLen = parseInt(subLenStr);
+          if (isNaN(subLen)) break;
           const subVal = value.substr(subPos + 4, subLen);
-          // Look for subId 08 (Often Terminal ID or similar but can store name/info)
-          if (subId === '08' && subVal.length > 3) {
+          
+          if (subId === '00' && !bankBin && subVal.length > 5 && subVal.length < 10) {
+            bankBin = subVal;
+          } else if (subId === '01') {
+            if (subVal.length > 10 && (subVal.includes('00') || subVal.includes('01'))) {
+               let nPos = 0;
+               while (nPos + 4 <= subVal.length) {
+                 const nId = subVal.substr(nPos, 2);
+                 const nLen = parseInt(subVal.substr(nPos + 2, 2));
+                 if (isNaN(nLen)) break;
+                 const nVal = subVal.substr(nPos + 4, nLen);
+                 if (nId === '00') bankBin = nVal;
+                 if (nId === '01' || nId === '02') accountNo = nVal;
+                 // Many banks put the account name in Sub-sub-tag 03 or 04 or 05
+                 if ((nId === '03' || nId === '04' || nId === '05' || nId === '07' || nId === '08') && !accountName && nVal.length > 3) {
+                    // Check if it looks like a name (usually uppercase)
+                    accountName = nVal;
+                 }
+                 nPos += 4 + nLen;
+               }
+            } else if (!bankBin) {
+              bankBin = subVal;
+            }
+          } else if (subId === '02' && !accountNo) {
+            accountNo = subVal;
+          } else if ((subId === '03' || subId === '04' || subId === '05') && !accountName && subVal.length > 4) {
             accountName = subVal;
           }
           subPos += 4 + subLen;
         }
       }
-
-      const tagNum = parseInt(tagId);
-      // Merchant Account Info is between Tag 26 and 51
-      if (tagNum >= 26 && tagNum <= 51) {
-        // Parse Sub-tags
-        let subPos = 0;
-        while (subPos < value.length) {
-          const subId = value.substr(subPos, 2);
-          const subLenStr = value.substr(subPos + 2, 2);
-          if (!subLenStr || isNaN(parseInt(subLenStr))) break;
-          
-          const subLen = parseInt(subLenStr);
-          const subVal = value.substr(subPos + 4, subLen);
-          
-          if (subId === '01') {
-            // Check if nested structure (Standard VietQR)
-            if (subVal.length > 10 && (subVal.startsWith('00') || subVal.includes('01'))) {
-               let nPos = 0;
-               while (nPos < subVal.length) {
-                 const nId = subVal.substr(nPos, 2);
-                 const nLenStr = subVal.substr(nPos + 2, 2);
-                 if (!nLenStr || isNaN(parseInt(nLenStr))) break;
-                 const nLen = parseInt(nLenStr);
-                 const nVal = subVal.substr(nPos + 4, nLen);
-                 if (nId === '00') bankBin = nVal;
-                 if (nId === '01' || nId === '02') accountNo = nVal;
-                 nPos += 4 + nLen;
-               }
-            } else {
-              if (!bankBin) bankBin = subVal;
-            }
-          } else if (subId === '02') {
-            if (!accountNo) accountNo = subVal;
+      
+      // If we haven't found a name yet, look for any uppercase string > 5 chars in other tags
+      if (!accountName && value.length > 5 && /^[A-Z\s]+$/.test(value) && tagNum > 50 && tagNum < 65) {
+         accountName = value;
+      }
+      
+      // Additional fallback for Name in Tag 62 subtags
+      if (tagId === '62' && !accountName) {
+        let scPos = 0;
+        while (scPos + 4 <= value.length) {
+          const scId = value.substr(scPos, 2);
+          const scLen = parseInt(value.substr(scPos + 2, 2));
+          if (isNaN(scLen)) break;
+          const scVal = value.substr(scPos + 4, scLen);
+          if ((scId === '08' || scId === '09' || scId === '01') && scVal.length > 4) {
+            accountName = scVal;
           }
-          
-          subPos += 4 + subLen;
+          scPos += 4 + scLen;
         }
       }
       
@@ -262,11 +270,13 @@ export const parseVietQR = (qrData: string): BankInfo | null => {
     }
 
     if (bankBin && accountNo) {
-      return { 
+      const result = { 
         bin: bankBin.replace(/[^0-9]/g, ''), 
         accountNo: accountNo.replace(/[^a-zA-Z0-9]/g, '').trim(),
         accountName: accountName.trim()
       };
+      console.log("VietQR Parse Success:", result);
+      return result;
     }
   } catch (e) {
     console.error("Error parsing VietQR", e);

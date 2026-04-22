@@ -68,6 +68,7 @@ const Transactions: React.FC = () => {
         if (data.length > 5) { // Minimum length for any useful data
           e.preventDefault();
           const info = parseCCCD(data);
+          const bankInfo = parseVietQR(data);
           
           if (info) {
             setCustomerName(info.name);
@@ -80,6 +81,8 @@ const Transactions: React.FC = () => {
             notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Đã nhận dạng ${data.includes('|') ? 'Căn cước' : 'Dữ liệu'} thành công`;
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
+          } else if (bankInfo) {
+            handleScan(data);
           } else {
             // If it's just a 12 digit number, maybe it's just the ID part
             if (/^\d{12}$/.test(data)) {
@@ -235,10 +238,12 @@ const Transactions: React.FC = () => {
         // Notification feedback
         const notification = document.createElement('div');
         notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
-        const nameStatus = bankInfo.accountName ? `[${bankInfo.accountName}]` : '(Không có tên)';
-        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> Quét thành công: ${bankInfo.accountNo} ${nameStatus}`;
+        const nameStatus = bankInfo.accountName ? `[${bankInfo.accountName}]` : '(KHÔNG CÓ TÊN)';
+        notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> QUÉT THÀNH CÔNG: ${bankInfo.accountNo} ${nameStatus}`;
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 4000);
+        
+        console.log("State updated - Account No:", bankInfo.accountNo, "Account Name:", bankInfo.accountName);
         return;
       }
 
@@ -534,13 +539,13 @@ const Transactions: React.FC = () => {
                   }}
                   placeholder="Nhập số tài khoản"
                 />
-                {type === 'BUY' && detectedAccountName && (
+                {type === 'BUY' && (customerAccountNo || detectedAccountName) && (
                   <div className="mt-2 p-2 bg-neutral-50/50 rounded border border-dashed border-neutral-200 animate-in fade-in slide-in-from-top-1">
                     <span className="text-[8px] text-neutral-400 font-black uppercase tracking-widest block mb-1">
-                      Tên chủ tài khoản (Hệ thống quét)
+                      Tên chủ tài khoản (Xác thực từ QR)
                     </span>
                     <p className="text-xs font-bold text-neutral-500 uppercase tracking-tighter">
-                      {detectedAccountName}
+                      {detectedAccountName || (customerAccountNo ? "Đã nhận số tài khoản - Không tìm thấy tên" : "...")}
                     </p>
                   </div>
                 )}
