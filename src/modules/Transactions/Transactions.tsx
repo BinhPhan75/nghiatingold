@@ -433,7 +433,8 @@ const Transactions: React.FC = () => {
   };
 
   const parseNumberFromSeparator = (val: string) => {
-    return Number(val.replace(/\./g, ''));
+    // Remove all non-digits to be safe and flexible
+    return Number(val.replace(/\D/g, ''));
   };
 
   return (
@@ -657,12 +658,23 @@ const Transactions: React.FC = () => {
                 </div>
                 <div className="input-field">
                   <label>Đơn giá điều chỉnh (VND/{selectedProduct?.unit || 'đơn vị'})</label>
-                  <input 
-                    type="text"
-                    value={formatNumberWithSeparator(customPrice)}
-                    className="font-mono font-bold text-lg bg-neutral-50 focus:bg-white"
-                    onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={formatNumberWithSeparator(customPrice)}
+                      className="font-mono font-bold text-lg bg-neutral-100 focus:bg-white pr-10"
+                      onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
+                    />
+                    {customPrice > 0 && (
+                      <button 
+                        onClick={() => setCustomPrice(0)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500"
+                        title="Xóa giá"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -678,12 +690,22 @@ const Transactions: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="input-field">
               <label>Chiết khấu tổng (VND)</label>
-              <input 
-                type="text"
-                value={formatNumberWithSeparator(discount)}
-                className="font-mono font-bold text-neutral-600"
-                onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
-              />
+              <div className="relative">
+                <input 
+                  type="text"
+                  value={formatNumberWithSeparator(discount)}
+                  className="font-mono font-bold text-neutral-600 pr-10"
+                  onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
+                />
+                {discount > 0 && (
+                  <button 
+                    onClick={() => setDiscount(0)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
