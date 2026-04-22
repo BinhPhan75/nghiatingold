@@ -534,10 +534,15 @@ const Transactions: React.FC = () => {
                   }}
                   placeholder="Nhập số tài khoản"
                 />
-                {detectedAccountName && (
-                  <p className="mt-1 text-[10px] font-bold text-neutral-600 uppercase tracking-wider flex items-center gap-1 animate-in fade-in slide-in-from-top-1 bg-neutral-50 p-1 rounded border border-neutral-100">
-                    <CheckCircle2 size={10} className="text-green-600" /> Chủ TK: {detectedAccountName}
-                  </p>
+                {type === 'BUY' && detectedAccountName && (
+                  <div className="mt-2 p-2 bg-neutral-50/50 rounded border border-dashed border-neutral-200 animate-in fade-in slide-in-from-top-1">
+                    <span className="text-[8px] text-neutral-400 font-black uppercase tracking-widest block mb-1">
+                      Tên chủ tài khoản (Hệ thống quét)
+                    </span>
+                    <p className="text-xs font-bold text-neutral-500 uppercase tracking-tighter">
+                      {detectedAccountName}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
