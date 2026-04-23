@@ -920,7 +920,7 @@ const Transactions: React.FC = () => {
                   </div>
                   <button 
                     onClick={() => {
-                      const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
+                      const summary = cart.map(item => `${item.product.name} x ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
                         ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${summary}`
                         : `NGHIA TIN THANH TOAN TIEN MUA ${summary} KH ${customerName} CCCD ${customerCCCD}`;
