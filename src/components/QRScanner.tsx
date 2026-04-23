@@ -247,11 +247,40 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose, mode = 'ocr', ti
     reader.onload = async (e) => {
       const base64 = e.target?.result as string;
       try {
-        const info = await analyzeCCCDImage(base64);
-        if (info) {
-          processResult(info);
+        // Step 1: Try to decode as QR first (High priority for accuracy)
+        const img = new Image();
+        img.src = base64;
+        await new Promise((resolve) => { img.onload = resolve; });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (context) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          context.drawImage(img, 0, 0);
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          const jsqrFunc = (jsQR as any).default || jsQR;
+          const code = jsqrFunc(imageData.data, imageData.width, imageData.height);
+          
+          if (code && code.data) {
+            console.log("QR detected in uploaded file:", code.data);
+            onScan(code.data);
+            setIsScanningFile(false);
+            return;
+          }
+        }
+
+        // Step 2: Fallback to AI OCR analysis only if mode is 'ocr'
+        if (mode === 'ocr') {
+          const info = await analyzeCCCDImage(base64);
+          if (info) {
+            processResult(info);
+          } else {
+            alert("AI không thể nhận diện được thông tin CCCD từ ảnh tải lên. Vui lòng dùng ảnh rõ nét hơn.");
+          }
         } else {
-          alert("AI không thể nhận diện được thông tin từ ảnh tải lên.");
+          // If we are in 'qr' mode and no QR was found above
+          alert("Không tìm thấy Mã QR hợp lệ trong ảnh tải lên. Vui lòng kiểm tra lại file ảnh.");
         }
       } catch (err: any) {
         console.error("Upload Scan Error:", err);

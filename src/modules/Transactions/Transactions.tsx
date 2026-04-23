@@ -233,30 +233,43 @@ const Transactions: React.FC = () => {
     setCashAmount(Math.max(0, totalAmount - val));
   };
 
-  const handleScan = (data: string | any) => {
+  const handleScan = (data: string | any, isManual: boolean = false) => {
     if (!data) return;
     
-    console.log("Dữ liệu quét được:", data);
+    console.log(`Dữ liệu quét (${isManual ? 'Thủ công' : 'Handheld'}):`, typeof data === 'string' ? data.substring(0, 30) : 'Object');
     
-    // Case 1: Data is an object from AI analysis
+    // Case 1: Data is an object from AI analysis (Gemini OCR for CCCD)
     if (typeof data === 'object' && data.id && data.name) {
+      if (isManual && scannerTarget !== 'cccd') {
+        alert("AI nhận diện được thông tin Căn cước, nhưng bạn đang tìm Tài khoản Ngân hàng. Vui lòng quét đúng mã QR Ngân hàng của khách.");
+        return;
+      }
+      
       setCustomerName(data.name);
       setCustomerCCCD(data.id);
       if (data.address) setCustomerAddress(data.address);
       setShowScanner(false);
       setLastError(null);
+      
+      const notification = document.createElement('div');
+      notification.className = 'fixed bottom-4 left-4 bg-ink text-gold-primary px-6 py-3 rounded-sm shadow-2xl z-50 font-black uppercase text-[10px] tracking-widest animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3 border-l-4 border-gold-primary';
+      notification.innerHTML = `<span class="bg-gold-primary text-ink rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> AI NHẬN DIỆN CCCD THÀNH CÔNG`;
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 3000);
       return;
     }
 
     // Case 2: Data is a string from QR scan
     if (typeof data === 'string') {
-      console.log("Xử lý chuỗi quét:", data.substring(0, 50) + "...");
-      
       // 2.1: Check if it's a Bank QR (VietQR starts with 000201)
       const bankInfo = parseVietQR(data);
-      console.log("Kết quả phân tích VietQR:", bankInfo);
       
       if (bankInfo) {
+        if (isManual && scannerTarget !== 'bank') {
+          alert("Bạn vừa quét Mã Ngân hàng (VietQR) trong khi đang tìm Căn cước (CCCD). Vui lòng quét đúng mã QR mặt sau CCCD.");
+          return;
+        }
+
         setCustomerAccountNo(bankInfo.accountNo);
         setDetectedAccountName(bankInfo.accountName || '');
         
@@ -289,6 +302,11 @@ const Transactions: React.FC = () => {
       // 2.2: Check if it's a CCCD QR
       const info = parseCCCD(data);
       if (info) {
+        if (isManual && scannerTarget !== 'cccd') {
+          alert("Bạn vừa quét Mã QR Căn cước trong khi đang tìm Tài khoản Ngân hàng. Vui lòng quét đúng mã VietQR.");
+          return;
+        }
+
         setCustomerName(info.name);
         setCustomerCCCD(info.id);
         if (info.address) setCustomerAddress(info.address);
@@ -980,7 +998,7 @@ const Transactions: React.FC = () => {
         <QRScanner 
           mode={scannerMode}
           title={scannerTarget === 'bank' ? 'Quét Mã QR Ngân hàng' : undefined}
-          onScan={handleScan} 
+          onScan={(data) => handleScan(data, true)} 
           onClose={() => setShowScanner(false)} 
         />
       )}
