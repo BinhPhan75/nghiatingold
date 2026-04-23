@@ -137,13 +137,13 @@ export const generateEMVCoQR = (
   const bid = bankId?.toString() || '970436';
   const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
   
-  // Format memo: Use only A-Z, 0-9 and spaces.
-  // Truncate to 75 characters to safely fit within e-wallet limits (like MoMo).
+  // Format memo: Use only A-Z, 0-9, spaces, dots and commas.
+  // Truncate to 95 characters.
   const cleanMemo = removeVietnameseTones(description)
-    .replace(/[^A-Z0-9 ]/g, " ")
+    .replace(/[^A-Z0-9 .,]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .substring(0, 75);
+    .substring(0, 95);
 
   // Merchant Account Info (Tag 38)
   const guid = formatTag('00', 'A000000727'); // Napas GUID

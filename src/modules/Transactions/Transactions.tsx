@@ -380,9 +380,14 @@ const Transactions: React.FC = () => {
       // Synchronized Memo Content Logic (Matches visual display and bank requirements)
       const memoSummary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
       const memoDesc = type === 'SELL' 
-        ? `${customerName} ${customerCCCD} CT MUA ${memoSummary}`
-        : `NGHIA TIN TT ${memoSummary} KH ${customerName} CCCD ${customerCCCD}`;
-      const memoClean = removeVietnameseTones(memoDesc).toUpperCase().substring(0, 70);
+        ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${memoSummary}`
+        : `NGHIA TIN THANH TOAN TIEN MUA ${memoSummary} KH ${customerName} CCCD ${customerCCCD}`;
+      const memoClean = removeVietnameseTones(memoDesc)
+        .toUpperCase()
+        .replace(/[^A-Z0-9 .,]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .substring(0, 95);
 
       if (type === 'SELL') {
         if (transferAmount > 0) {
@@ -884,9 +889,14 @@ const Transactions: React.FC = () => {
                     {(() => {
                       const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
-                        ? `${customerName} ${customerCCCD} CT MUA ${summary}`
-                        : `NGHIA TIN TT ${summary} KH ${customerName} CCCD ${customerCCCD}`;
-                      const clean = removeVietnameseTones(descOrig).toUpperCase().substring(0, 70);
+                        ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${summary}`
+                        : `NGHIA TIN THANH TOAN TIEN MUA ${summary} KH ${customerName} CCCD ${customerCCCD}`;
+                      const clean = removeVietnameseTones(descOrig)
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9 .,]/g, " ")
+                        .replace(/\s+/g, " ")
+                        .trim()
+                        .substring(0, 95);
                       return clean;
                     })()}
                   </div>
@@ -894,9 +904,14 @@ const Transactions: React.FC = () => {
                     onClick={() => {
                       const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
-                        ? `${customerName} ${customerCCCD} CT MUA ${summary}`
-                        : `NGHIA TIN TT ${summary} KH ${customerName} CCCD ${customerCCCD}`;
-                      const clean = removeVietnameseTones(descOrig).toUpperCase().substring(0, 70);
+                        ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${summary}`
+                        : `NGHIA TIN THANH TOAN TIEN MUA ${summary} KH ${customerName} CCCD ${customerCCCD}`;
+                      const clean = removeVietnameseTones(descOrig)
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9 .,]/g, " ")
+                        .replace(/\s+/g, " ")
+                        .trim()
+                        .substring(0, 95);
                       navigator.clipboard.writeText(clean);
                       alert("Đã sao chép nội dung!");
                     }}
