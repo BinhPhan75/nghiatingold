@@ -137,10 +137,10 @@ export const generateEMVCoQR = (
   const bid = bankId?.toString() || '970436';
   const name = removeVietnameseTones(accountName).substring(0, 25).toUpperCase();
   
-  // Format memo: Use only A-Z, 0-9, spaces, dots and commas.
+  // Format memo: Use only A-Z, a-z, 0-9, spaces, dots and commas.
   // Truncate to 95 characters.
   const cleanMemo = removeVietnameseTones(description)
-    .replace(/[^A-Z0-9 .,]/g, " ")
+    .replace(/[^a-zA-Z0-9 .,]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .substring(0, 95);

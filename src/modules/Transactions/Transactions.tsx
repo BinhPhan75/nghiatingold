@@ -402,7 +402,8 @@ const Transactions: React.FC = () => {
         : `NGHIA TIN THANH TOAN TIEN MUA ${memoSummary} KH ${customerName} CCCD ${customerCCCD}`;
       const memoClean = removeVietnameseTones(memoDesc)
         .toUpperCase()
-        .replace(/[^A-Z0-9 .,]/g, " ")
+        .replace(/ X /g, " x ")
+        .replace(/[^a-zA-Z0-9 .,]/g, " ")
         .replace(/\s+/g, " ")
         .trim()
         .substring(0, 95);
@@ -905,13 +906,14 @@ const Transactions: React.FC = () => {
                   <p className="text-[9px] font-bold uppercase text-neutral-400 tracking-widest mb-2 leading-none italic">Nội dung chuyển khoản (Không dấu)</p>
                   <div className="font-mono font-bold text-sm text-ink leading-relaxed break-words pr-8">
                     {(() => {
-                      const summary = cart.map(item => `${item.product.name} x ${item.quantity}`).join(' ');
+                      const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
                         ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${summary}`
                         : `NGHIA TIN THANH TOAN TIEN MUA ${summary} KH ${customerName} CCCD ${customerCCCD}`;
                       const clean = removeVietnameseTones(descOrig)
                         .toUpperCase()
-                        .replace(/[^A-Z0-9 .,]/g, " ")
+                        .replace(/ X /g, " x ")
+                        .replace(/[^a-zA-Z0-9 .,]/g, " ")
                         .replace(/\s+/g, " ")
                         .trim()
                         .substring(0, 95);
@@ -920,13 +922,14 @@ const Transactions: React.FC = () => {
                   </div>
                   <button 
                     onClick={() => {
-                      const summary = cart.map(item => `${item.product.name} x ${item.quantity}`).join(' ');
+                      const summary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
                       const descOrig = type === 'SELL' 
                         ? `${customerName} ${customerCCCD} CHUYEN TIEN MUA ${summary}`
                         : `NGHIA TIN THANH TOAN TIEN MUA ${summary} KH ${customerName} CCCD ${customerCCCD}`;
                       const clean = removeVietnameseTones(descOrig)
                         .toUpperCase()
-                        .replace(/[^A-Z0-9 .,]/g, " ")
+                        .replace(/ X /g, " x ")
+                        .replace(/[^a-zA-Z0-9 .,]/g, " ")
                         .replace(/\s+/g, " ")
                         .trim()
                         .substring(0, 95);
