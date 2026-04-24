@@ -35,7 +35,8 @@ const Transactions: React.FC = () => {
   }
   const [cart, setCart] = useState<CartItem[]>([]);
   
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number | string>(1);
+  const [quantityInput, setQuantityInput] = useState('1');
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
   const [otherDeduction, setOtherDeduction] = useState<number>(0);
@@ -202,20 +203,22 @@ const Transactions: React.FC = () => {
   }, [totalAmount, cashAmount]);
 
   const addToCart = () => {
-    if (!selectedProduct || quantity <= 0 || customPrice <= 0) {
+    const qNum = typeof quantity === 'string' ? parseFloat(quantity.replace(/,/g, '.')) : quantity;
+    if (!selectedProduct || qNum <= 0 || customPrice <= 0) {
       alert("Vui lòng chọn loại vàng, số lượng và đơn giá hợp lệ");
       return;
     }
     const newItem: CartItem = {
       id: Math.random().toString(36).substr(2, 9),
       product: selectedProduct,
-      quantity,
+      quantity: qNum,
       pricePerUnit: customPrice
     };
     setCart([...cart, newItem]);
     // Reset item selection for next one
     setSelectedProduct(null);
     setQuantity(1);
+    setQuantityInput('1');
     setCustomPrice(0);
   };
 
@@ -454,6 +457,7 @@ const Transactions: React.FC = () => {
     setDetectedAccountName('');
     setCart([]);
     setQuantity(1);
+    setQuantityInput('1');
     setDiscount(0);
     setOtherDeduction(0);
     setDeductionNote('');
@@ -473,8 +477,25 @@ const Transactions: React.FC = () => {
   };
 
   const parseNumberFromSeparator = (val: string) => {
-    // Remove all non-digits to be safe and flexible
-    return Number(val.replace(/\D/g, ''));
+    if (!val) return 0;
+    // Normalizing decimal point: convert comma to dot, then remove thousands separators (common in vi-VN formatting)
+    // But since this is for currency fields like Discount/Cash which are usually integers in VND:
+    // we should allow flexible input but eventually parse to number
+    const normalized = val.replace(/\./g, '').replace(/,/g, '.');
+    const num = parseFloat(normalized);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const handleQuantityChange = (val: string) => {
+    // Replace comma with dot for internal numeric storage
+    setQuantityInput(val);
+    const normalized = val.replace(/,/g, '.');
+    const num = parseFloat(normalized);
+    if (!isNaN(num)) {
+      setQuantity(num);
+    } else if (val === '') {
+      setQuantity(0);
+    }
   };
 
   return (
@@ -693,11 +714,11 @@ const Transactions: React.FC = () => {
                 <div className="input-field">
                   <label>Số lượng ({selectedProduct?.unit || 'đơn vị'})</label>
                   <input 
-                    type="number" 
+                    type="text" 
                     inputMode="decimal"
-                    step="any" 
-                    value={quantity} 
-                    onChange={(e) => setQuantity(Number(e.target.value))} 
+                    value={quantityInput} 
+                    onChange={(e) => handleQuantityChange(e.target.value)} 
+                    placeholder="0,00"
                   />
                 </div>
                 <div className="input-field">
