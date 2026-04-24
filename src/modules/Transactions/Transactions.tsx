@@ -694,7 +694,8 @@ const Transactions: React.FC = () => {
                   <label>Số lượng ({selectedProduct?.unit || 'đơn vị'})</label>
                   <input 
                     type="number" 
-                    step="0.01" 
+                    inputMode="decimal"
+                    step="any" 
                     value={quantity} 
                     onChange={(e) => setQuantity(Number(e.target.value))} 
                   />
@@ -704,6 +705,7 @@ const Transactions: React.FC = () => {
                   <div className="relative">
                     <input 
                       type="text"
+                      inputMode="numeric"
                       value={formatNumberWithSeparator(customPrice)}
                       className="font-mono font-bold text-lg bg-neutral-100 focus:bg-white pr-10"
                       onChange={(e) => setCustomPrice(parseNumberFromSeparator(e.target.value))}
@@ -736,6 +738,7 @@ const Transactions: React.FC = () => {
               <div className="relative">
                 <input 
                   type="text"
+                  inputMode="numeric"
                   value={formatNumberWithSeparator(discount)}
                   className="font-mono font-bold text-neutral-600 pr-10"
                   onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
@@ -757,6 +760,7 @@ const Transactions: React.FC = () => {
                 <div className="relative">
                   <input 
                     type="text"
+                    inputMode="numeric"
                     value={formatNumberWithSeparator(otherDeduction)}
                     className="font-mono font-bold text-red-600 pr-10"
                     onChange={(e) => setOtherDeduction(parseNumberFromSeparator(e.target.value))}
@@ -792,6 +796,7 @@ const Transactions: React.FC = () => {
               <label className="text-vcb-green font-bold uppercase text-[9px]">Chuyển khoản (VND)</label>
               <input 
                 type="text"
+                inputMode="numeric"
                 value={formatNumberWithSeparator(transferAmount)}
                 className="bg-vcb-blue/5 border-vcb-blue/20"
                 onChange={(e) => handleTransferChange(parseNumberFromSeparator(e.target.value))}
@@ -801,6 +806,7 @@ const Transactions: React.FC = () => {
               <label className="text-orange-600 font-bold uppercase text-[9px]">Tiền mặt (VND)</label>
               <input 
                 type="text"
+                inputMode="numeric"
                 value={formatNumberWithSeparator(cashAmount)}
                 className="bg-orange-50 border-orange-200"
                 onChange={(e) => handleCashChange(parseNumberFromSeparator(e.target.value))}
