@@ -64,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (session?.user) {
         setUser(session.user);
         fetchProfile(session.user.id);
+        updateLastSeen(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
@@ -71,8 +72,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Periodic heartbeat to update last_seen_at
+    const intervalId = setInterval(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          updateLastSeen(session.user.id);
+        }
+      });
+    }, 1000 * 60 * 2); // Every 2 minutes
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(intervalId);
+    };
   }, []);
+
+  const updateLastSeen = async (uid: string) => {
+    try {
+      await supabase
+        .from('profiles')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', uid);
+    } catch (err) {
+      console.warn("Could not update last_seen_at:", err);
+    }
+  };
 
   const fetchProfile = async (uid: string) => {
     try {

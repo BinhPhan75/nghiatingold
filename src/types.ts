@@ -7,6 +7,7 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   status: UserStatus;
+  last_seen_at?: string;
   created_at: string;
 }
 

@@ -146,21 +146,6 @@ const System: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (userId: string, newStatus: UserStatus) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: newStatus })
-        .eq('id', userId);
-
-      if (error) throw error;
-      alert("Đã cập nhật trạng thái nhân viên thành công!");
-      fetchProfiles();
-    } catch (error: any) {
-      alert("Lỗi khi cập nhật trạng thái: " + error.message);
-    }
-  };
-
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBank.short_name || !newBank.bin) return;
@@ -530,7 +515,6 @@ const System: React.FC = () => {
                   currentProfile={profile} 
                   showRoleUpdate={showRoleUpdate}
                   setShowRoleUpdate={setShowRoleUpdate}
-                  handleUpdateStatus={handleUpdateStatus}
                   handleUpdateRole={handleUpdateRole}
                 />
               ))}
@@ -809,15 +793,22 @@ const System: React.FC = () => {
 
 export default System;
 
+const isOnline = (lastSeenAt?: string) => {
+  if (!lastSeenAt) return false;
+  const lastSeen = new Date(lastSeenAt).getTime();
+  const now = new Date().getTime();
+  // Consider online if seen in the last 5 minutes
+  return (now - lastSeen) < (5 * 60 * 1000);
+};
+
 const UserCard: React.FC<{ 
   p: Profile, 
   isAdmin: boolean, 
   currentProfile: Profile | null, 
   showRoleUpdate: string | null,
   setShowRoleUpdate: (val: string | null) => void,
-  handleUpdateStatus: (id: string, status: UserStatus) => void,
   handleUpdateRole: (id: string, role: UserRole) => void
-}> = ({ p, isAdmin, currentProfile, showRoleUpdate, setShowRoleUpdate, handleUpdateStatus, handleUpdateRole }) => (
+}> = ({ p, isAdmin, currentProfile, showRoleUpdate, setShowRoleUpdate, handleUpdateRole }) => (
   <div className="p-6 border border-neutral-100 rounded-sm relative overflow-hidden group bg-white shadow-sm hover:shadow-md transition-shadow">
     <div className={`absolute top-0 right-0 w-20 h-20 -mr-10 -mt-10 rotate-45 opacity-10 transition-transform group-hover:scale-110 ${p.role === 'ADMIN' ? 'bg-red-500' : 'bg-gold-primary'}`}></div>
     <div className="flex flex-col gap-1 mb-4">
@@ -825,12 +816,19 @@ const UserCard: React.FC<{
         <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
           {p.role === 'ADMIN' ? 'Quản trị viên' : p.role === 'ACCOUNTANT' ? 'Kế toán' : 'Bán hàng'}
         </span>
-        <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
-          p.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
-          p.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-        }`}>
-          {p.status}
-        </span>
+        <div className="flex items-center gap-2">
+          {isOnline(p.last_seen_at) ? (
+            <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+              Trực tuyến
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-neutral-100 text-neutral-500">
+              <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full"></span>
+              Ngoại tuyến
+            </span>
+          )}
+        </div>
       </div>
       <h4 className="text-lg font-bold lowercase italic">{p.full_name || p.email.split('@')[0]}</h4>
     </div>
@@ -840,24 +838,6 @@ const UserCard: React.FC<{
     </div>
     {isAdmin && p.email !== currentProfile?.email && (
       <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          {p.status === 'APPROVED' ? (
-            <button 
-              onClick={() => handleUpdateStatus(p.id, 'BLOCKED')}
-              className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-red-100"
-            >
-              Khóa tài khoản
-            </button>
-          ) : (
-            <button 
-              onClick={() => handleUpdateStatus(p.id, 'APPROVED')}
-              className="text-green-500 hover:bg-green-50 px-3 py-1.5 rounded-sm text-[9px] font-black uppercase border border-green-100"
-            >
-              Kích hoạt / Mở khóa
-            </button>
-          )}
-        </div>
-
         <button 
           onClick={() => setShowRoleUpdate(showRoleUpdate === p.id ? null : p.id)}
           className="text-[10px] font-black uppercase text-neutral-400 hover:text-ink transition-colors text-left flex items-center gap-1"
