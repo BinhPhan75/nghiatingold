@@ -360,8 +360,8 @@ const Transactions: React.FC = () => {
       const weight = itemSubtotal / cartSubtotal;
       
       // Proportional distribution
-      let itemDiscount = isLast ? (discount - distributedDiscount) : Math.round(discount * weight);
-      let itemPremium = isLast ? (premium - distributedPremium) : Math.round(premium * weight);
+      let itemDiscount = type === 'SELL' ? (isLast ? (discount - distributedDiscount) : Math.round(discount * weight)) : 0;
+      let itemPremium = type === 'BUY' ? (isLast ? (premium - distributedPremium) : Math.round(premium * weight)) : 0;
       let itemOtherDeduction = isLast ? (otherDeduction - distributedOtherDeduction) : Math.round(otherDeduction * weight);
       let itemCash = isLast ? (cashAmount - distributedCash) : Math.round(cashAmount * weight);
       let itemTransfer = isLast ? (transferAmount - distributedTransfer) : Math.round(transferAmount * weight);

@@ -190,25 +190,32 @@ const Reports: React.FC = () => {
     ];
 
     const rows = transactions.flatMap(group => {
-      return group.items.map(t => [
-        new Date(t.created_at).toLocaleString('vi-VN'),
-        t.type === 'BUY' ? "MUA VÀO" : "BÁN RA",
-        t.customer_name,
-        `'${t.customer_cccd}`, 
-        t.dia_chi || "",
-        t.product_name,
-        t.quantity,
-        t.unit,
-        t.price_per_unit,
-        t.total_amount,
-        t.chiet_khau || 0,
-        t.cong_them || 0,
-        t.giam_tru || t.other_deduction || 0,
-        t.deduction_note || "",
-        t.tien_mat || 0,
-        t.chuyen_khoan || 0,
-        group.salesperson?.full_name || "Hệ thống"
-      ]);
+      return group.items.map(t => {
+        // Backward compatibility logic for export
+        const discountVal = t.type === 'SELL' ? (t.chiet_khau || 0) : 0;
+        const premiumVal = t.type === 'BUY' ? (t.cong_them || t.chiet_khau || 0) : (t.cong_them || 0);
+        const deductionVal = t.giam_tru || t.other_deduction || 0;
+
+        return [
+          new Date(t.created_at).toLocaleString('vi-VN'),
+          t.type === 'BUY' ? "MUA VÀO" : "BÁN RA",
+          t.customer_name,
+          `'${t.customer_cccd}`, 
+          t.dia_chi || "",
+          t.product_name,
+          t.quantity,
+          t.unit,
+          t.price_per_unit,
+          t.total_amount,
+          discountVal,
+          premiumVal,
+          deductionVal,
+          t.deduction_note || "",
+          t.tien_mat || 0,
+          t.chuyen_khoan || 0,
+          group.salesperson?.full_name || "Hệ thống"
+        ];
+      });
     });
 
     const csvContent = [
@@ -521,7 +528,7 @@ const Reports: React.FC = () => {
                                 <span className="text-neutral-500">Thành tiền:</span>
                                 <span className="font-bold">{formatCurrency(item.price_per_unit * item.quantity)}</span>
                               </div>
-                              {selectedTransaction.type === 'BUY' && (item.cong_them || (item.chiet_khau > 0 && item.chiet_khau)) && (
+                              {selectedTransaction.type === 'BUY' && (item.cong_them > 0 || (item.chiet_khau > 0)) && (
                                 <div className="flex justify-between text-xs italic text-blue-500">
                                   <span>Tiền thêm (+):</span>
                                   <span className="font-bold">+{formatCurrency(item.cong_them || item.chiet_khau)}</span>
@@ -533,7 +540,7 @@ const Reports: React.FC = () => {
                                   <span className="font-bold">-{formatCurrency(item.chiet_khau)}</span>
                                 </div>
                               )}
-                              {selectedTransaction.type === 'BUY' && (item.giam_tru || (item.other_deduction || 0) > 0) && (
+                              {(selectedTransaction.type === 'BUY' || selectedTransaction.type === 'SELL') && (item.giam_tru > 0 || (item.other_deduction || 0) > 0) && (
                                 <div className="flex justify-between text-xs text-red-500 italic pb-1">
                                   <div className="flex flex-col">
                                     <span>Giảm trừ khác (-):</span>
