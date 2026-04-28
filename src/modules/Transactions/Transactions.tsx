@@ -39,6 +39,7 @@ const Transactions: React.FC = () => {
   const [quantityInput, setQuantityInput] = useState('1');
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
+  const [premium, setPremium] = useState<number>(0);
   const [otherDeduction, setOtherDeduction] = useState<number>(0);
   const [deductionNote, setDeductionNote] = useState('');
   const [cashAmount, setCashAmount] = useState<number>(0);
@@ -194,7 +195,7 @@ const Transactions: React.FC = () => {
   
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
   const totalAmount = type === 'BUY' 
-    ? Math.max(0, cartSubtotal + discount - otherDeduction) 
+    ? Math.max(0, cartSubtotal + premium - otherDeduction) 
     : Math.max(0, cartSubtotal - discount);
 
   useEffect(() => {
@@ -347,6 +348,7 @@ const Transactions: React.FC = () => {
     
     // Distribute payment proportionally with rounding adjustment for last item
     let distributedDiscount = 0;
+    let distributedPremium = 0;
     let distributedOtherDeduction = 0;
     let distributedCash = 0;
     let distributedTransfer = 0;
@@ -359,16 +361,18 @@ const Transactions: React.FC = () => {
       
       // Proportional distribution
       let itemDiscount = isLast ? (discount - distributedDiscount) : Math.round(discount * weight);
+      let itemPremium = isLast ? (premium - distributedPremium) : Math.round(premium * weight);
       let itemOtherDeduction = isLast ? (otherDeduction - distributedOtherDeduction) : Math.round(otherDeduction * weight);
       let itemCash = isLast ? (cashAmount - distributedCash) : Math.round(cashAmount * weight);
       let itemTransfer = isLast ? (transferAmount - distributedTransfer) : Math.round(transferAmount * weight);
 
       distributedDiscount += itemDiscount;
+      distributedPremium += itemPremium;
       distributedOtherDeduction += itemOtherDeduction;
       distributedCash += itemCash;
       distributedTransfer += itemTransfer;
 
-      const itemTotal = type === 'BUY' ? (itemSubtotal + itemDiscount - itemOtherDeduction) : Math.max(0, itemSubtotal - itemDiscount);
+      const itemTotal = type === 'BUY' ? (itemSubtotal + itemPremium - itemOtherDeduction) : Math.max(0, itemSubtotal - itemDiscount);
       
       return {
         type,
@@ -384,6 +388,8 @@ const Transactions: React.FC = () => {
         price_per_unit: item.pricePerUnit,
         total_amount: itemTotal,
         chiet_khau: itemDiscount,
+        cong_them: itemPremium,
+        giam_tru: itemOtherDeduction,
         other_deduction: itemOtherDeduction,
         deduction_note: type === 'BUY' ? deductionNote : null,
         tien_mat: itemCash,
@@ -459,6 +465,7 @@ const Transactions: React.FC = () => {
     setQuantity(1);
     setQuantityInput('1');
     setDiscount(0);
+    setPremium(0);
     setOtherDeduction(0);
     setDeductionNote('');
     setCashAmount(0);
@@ -760,13 +767,20 @@ const Transactions: React.FC = () => {
                 <input 
                   type="text"
                   inputMode="numeric"
-                  value={formatNumberWithSeparator(discount)}
+                  value={formatNumberWithSeparator(type === 'BUY' ? premium : discount)}
                   className="font-mono font-bold text-neutral-600 pr-10"
-                  onChange={(e) => setDiscount(parseNumberFromSeparator(e.target.value))}
+                  onChange={(e) => {
+                    const val = parseNumberFromSeparator(e.target.value);
+                    if (type === 'BUY') setPremium(val);
+                    else setDiscount(val);
+                  }}
                 />
-                {discount > 0 && (
+                {(type === 'BUY' ? premium > 0 : discount > 0) && (
                   <button 
-                    onClick={() => setDiscount(0)}
+                    onClick={() => {
+                      if (type === 'BUY') setPremium(0);
+                      else setDiscount(0);
+                    }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-red-500"
                   >
                     <X size={16} />
@@ -842,10 +856,16 @@ const Transactions: React.FC = () => {
               <span className="text-[10px] uppercase font-black">Tạm tính ({cart.length} mặt hàng)</span>
               <span className="text-lg font-bold">{formatCurrency(cartSubtotal)}</span>
             </div>
-            {discount > 0 && (
-              <div className={`flex justify-between items-center italic ${type === 'BUY' ? 'text-blue-500' : 'text-red-400'}`}>
-                <span className="text-[10px] uppercase font-black">{type === 'BUY' ? 'Cộng thêm (+)' : 'Chiết khấu (-)'}</span>
-                <span className="text-lg font-bold">{type === 'BUY' ? '+' : '-'}{formatCurrency(discount)}</span>
+            {discount > 0 && type === 'SELL' && (
+              <div className="flex justify-between items-center italic text-red-400">
+                <span className="text-[10px] uppercase font-black">Chiết khấu (-)</span>
+                <span className="text-lg font-bold">-{formatCurrency(discount)}</span>
+              </div>
+            )}
+            {premium > 0 && type === 'BUY' && (
+              <div className="flex justify-between items-center italic text-blue-500">
+                <span className="text-[10px] uppercase font-black">Cộng thêm (+)</span>
+                <span className="text-lg font-bold">+{formatCurrency(premium)}</span>
               </div>
             )}
             {type === 'BUY' && otherDeduction > 0 && (

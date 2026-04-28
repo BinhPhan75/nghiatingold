@@ -96,7 +96,9 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   tien_mat NUMERIC DEFAULT 0,
   chuyen_khoan NUMERIC DEFAULT 0,
   chiet_khau NUMERIC DEFAULT 0,
-  other_deduction NUMERIC DEFAULT 0,
+  cong_them NUMERIC DEFAULT 0, -- Cộng thêm (thường dùng khi MUA)
+  giam_tru NUMERIC DEFAULT 0, -- Giảm trừ (thường dùng khi MUA)
+  other_deduction NUMERIC DEFAULT 0, -- Tương đương giam_tru, giữ để tương thích
   deduction_note TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id)

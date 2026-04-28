@@ -131,6 +131,8 @@ const Reports: React.FC = () => {
           existingGroup.tien_mat += (t.tien_mat || 0);
           existingGroup.chuyen_khoan += (t.chuyen_khoan || 0);
           existingGroup.chiet_khau += (t.chiet_khau || 0);
+          existingGroup.cong_them = (existingGroup.cong_them || 0) + (t.cong_them || 0);
+          existingGroup.giam_tru = (existingGroup.giam_tru || 0) + (t.giam_tru || 0);
           existingGroup.other_deduction = (existingGroup.other_deduction || 0) + (t.other_deduction || 0);
         } else {
           grouped.push({
@@ -178,6 +180,8 @@ const Reports: React.FC = () => {
       "Đơn vị",
       "Đơn giá",
       "Tổng tiền",
+      "Chiết khấu",
+      "Cộng thêm",
       "Giảm trừ",
       "Ghi chú giảm",
       "Tiền mặt",
@@ -197,7 +201,9 @@ const Reports: React.FC = () => {
         t.unit,
         t.price_per_unit,
         t.total_amount,
-        t.other_deduction || 0,
+        t.chiet_khau || 0,
+        t.cong_them || 0,
+        t.giam_tru || t.other_deduction || 0,
         t.deduction_note || "",
         t.tien_mat || 0,
         t.chuyen_khoan || 0,
@@ -515,19 +521,25 @@ const Reports: React.FC = () => {
                                 <span className="text-neutral-500">Thành tiền:</span>
                                 <span className="font-bold">{formatCurrency(item.price_per_unit * item.quantity)}</span>
                               </div>
-                              {item.chiet_khau > 0 && (
-                                <div className={`flex justify-between text-xs italic ${selectedTransaction.type === 'BUY' ? 'text-blue-500' : 'text-red-500'}`}>
-                                  <span>{selectedTransaction.type === 'BUY' ? 'Tiền thêm (+):' : 'Chiết khấu (-):'}</span>
-                                  <span className="font-bold">{selectedTransaction.type === 'BUY' ? '+' : '-'}{formatCurrency(item.chiet_khau)}</span>
+                              {selectedTransaction.type === 'BUY' && (item.cong_them || (item.chiet_khau > 0 && item.chiet_khau)) && (
+                                <div className="flex justify-between text-xs italic text-blue-500">
+                                  <span>Tiền thêm (+):</span>
+                                  <span className="font-bold">+{formatCurrency(item.cong_them || item.chiet_khau)}</span>
                                 </div>
                               )}
-                              {selectedTransaction.type === 'BUY' && (item.other_deduction || 0) > 0 && (
+                              {selectedTransaction.type === 'SELL' && item.chiet_khau > 0 && (
+                                <div className="flex justify-between text-xs italic text-red-500">
+                                  <span>Chiết khấu (-):</span>
+                                  <span className="font-bold">-{formatCurrency(item.chiet_khau)}</span>
+                                </div>
+                              )}
+                              {selectedTransaction.type === 'BUY' && (item.giam_tru || (item.other_deduction || 0) > 0) && (
                                 <div className="flex justify-between text-xs text-red-500 italic pb-1">
                                   <div className="flex flex-col">
                                     <span>Giảm trừ khác (-):</span>
                                     {item.deduction_note && <span className="text-[8px] text-neutral-400 not-italic uppercase tracking-widest">{item.deduction_note}</span>}
                                   </div>
-                                  <span className="font-bold">-{formatCurrency(item.other_deduction || 0)}</span>
+                                  <span className="font-bold">-{formatCurrency(item.giam_tru || item.other_deduction || 0)}</span>
                                 </div>
                               )}
                             </div>
