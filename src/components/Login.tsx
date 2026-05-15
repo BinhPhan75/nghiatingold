@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const Login: React.FC = () => {
@@ -40,11 +40,16 @@ const Login: React.FC = () => {
         className="w-full max-w-md bg-paper rounded-sm p-8 shadow-2xl"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gold-primary flex items-center justify-center rounded-sm mb-4">
-            <Briefcase className="text-ink" size={32} />
+          <div className="w-20 h-20 bg-white flex items-center justify-center rounded-sm mb-4 p-2 shadow-inner border border-gold-primary/20">
+            <img 
+              src="https://raw.githubusercontent.com/BinhPhan75/nghiatingold/refs/heads/main/icon.png" 
+              alt="Logo" 
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-3xl text-ink">Đăng nhập</h1>
-          <p className="text-[10px] uppercase font-black text-neutral-400 tracking-[0.2em] mt-2">Hệ Thống NGHIATIN GOLD</p>
+          <h1 className="text-3xl text-ink font-black">NGHIATIN <span className="text-gold-dark italic">GOLD</span></h1>
+          <p className="text-[10px] uppercase font-black text-neutral-400 tracking-[0.2em] mt-2 italic shadow-sm">Hệ Thống Quản Lý Nội Bộ</p>
         </div>
 
         {error && (

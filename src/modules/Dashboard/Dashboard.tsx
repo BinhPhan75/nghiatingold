@@ -35,26 +35,43 @@ const Dashboard: React.FC = () => {
       .gte('created_at', `${today}T00:00:00`);
 
     if (transactions) {
-      const buy = transactions.filter(t => t.type === 'BUY');
-      const sell = transactions.filter(t => t.type === 'SELL');
+      const buyTransactions = transactions.filter(t => t.type === 'BUY');
+      const sellTransactions = transactions.filter(t => t.type === 'SELL');
+
+      // Helper to count orders (grouped transactions)
+      const countOrders = (data: any[]) => {
+        const grouped: any[] = [];
+        const sorted = [...data].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        sorted.forEach(t => {
+          const tDate = new Date(t.created_at);
+          const existingGroup = grouped.find(g => 
+            g.customer_cccd === t.customer_cccd && 
+            g.type === t.type &&
+            Math.abs(new Date(g.created_at).getTime() - tDate.getTime()) < 60000
+          );
+          if (!existingGroup) grouped.push(t);
+        });
+        return grouped.length;
+      };
 
       setStats({
-        buyTotal: buy.reduce((s, t) => s + t.total_amount, 0),
-        sellTotal: sell.reduce((s, t) => s + t.total_amount, 0),
-        buyCount: buy.length,
-        sellCount: sell.length,
+        buyTotal: buyTransactions.reduce((s, t) => s + t.total_amount, 0),
+        sellTotal: sellTransactions.reduce((s, t) => s + t.total_amount, 0),
+        buyCount: countOrders(buyTransactions),
+        sellCount: countOrders(sellTransactions),
       });
 
       // Pie data: weight by product for BUY
       const buyMap: Record<string, number> = {};
-      buy.forEach(t => {
+      buyTransactions.forEach(t => {
         buyMap[t.product_name] = (buyMap[t.product_name] || 0) + t.total_amount;
       });
       setBuyPieData(Object.entries(buyMap).map(([name, value]) => ({ name, value })));
 
       // Pie data: weight by product for SELL
       const sellMap: Record<string, number> = {};
-      sell.forEach(t => {
+      sellTransactions.forEach(t => {
         sellMap[t.product_name] = (sellMap[t.product_name] || 0) + t.total_amount;
       });
       setSellPieData(Object.entries(sellMap).map(([name, value]) => ({ name, value })));

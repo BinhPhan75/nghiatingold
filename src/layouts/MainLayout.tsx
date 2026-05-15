@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, FileBarChart, Settings, LogOut, Briefcase } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, FileBarChart, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -32,8 +32,13 @@ const MainLayout: React.FC = () => {
     <div className="flex flex-col md:flex-row min-h-screen bg-ink overflow-hidden text-ink">
       {/* Desktop Sidebar navigation */}
       <nav className="hidden md:flex w-24 border-r border-gold-primary/20 flex-col items-center py-8 gap-8 shrink-0">
-        <div className="w-12 h-12 bg-gold-primary flex items-center justify-center rounded-sm mb-4">
-          <Briefcase className="text-ink" size={24} />
+        <div className="w-12 h-12 bg-white flex items-center justify-center rounded-sm mb-4 p-1 shadow-sm border border-gold-primary/20">
+          <img 
+            src="https://raw.githubusercontent.com/BinhPhan75/nghiatingold/refs/heads/main/icon.png" 
+            alt="Logo" 
+            className="w-full h-full object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
 
         <div className="flex flex-col gap-4">
@@ -62,7 +67,13 @@ const MainLayout: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0 bg-gray-bg relative overflow-hidden">
         {/* Top Header */}
         <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-paper border-b border-neutral-100 shadow-sm shrink-0">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <img 
+              src="https://raw.githubusercontent.com/BinhPhan75/nghiatingold/refs/heads/main/icon.png" 
+              alt="Logo" 
+              className="w-8 h-8 md:w-10 md:h-10 object-contain"
+              referrerPolicy="no-referrer"
+            />
             <h2 className="text-lg md:text-xl m-0 tracking-tight text-ink font-black">
               NGHIATIN <span className="text-gold-dark italic">GOLD</span>
             </h2>
