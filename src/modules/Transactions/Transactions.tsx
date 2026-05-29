@@ -3,13 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< Updated upstream
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye } from 'lucide-react';
+=======
+import { Camera, QrCode, CreditCard, Send, CheckCircle2, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye, Loader2 } from 'lucide-react';
+>>>>>>> Stashed changes
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR, generateEMVCoQR, getRawQRUrl } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Transactions: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, isAdmin, user } = useAuth();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const initialType = searchParams.get('type') === 'BUY' ? 'BUY' : 'SELL';
@@ -53,11 +57,17 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
+<<<<<<< Updated upstream
   const [showInvoice, setShowInvoice] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceResult, setInvoiceResult] = useState<any>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+=======
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState<'preview' | 'draft' | null>(null);
+  const [invoiceResult, setInvoiceResult] = useState<any>(null);
+>>>>>>> Stashed changes
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -498,7 +508,6 @@ const Transactions: React.FC = () => {
     setSubmitting(false);
   };
 
-  const { user } = useAuth();
   const currentUserEmail = user?.email;
 
   const formatNumberWithSeparator = (val: number) => {
@@ -524,6 +533,115 @@ const Transactions: React.FC = () => {
       setQuantity(num);
     } else if (val === '') {
       setQuantity(0);
+    }
+  };
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+    };
+  };
+
+  const buildInvoicePayload = () => ({
+    buyerName: customerName,
+    buyerIdNo: customerCCCD,
+    buyerAddress: customerAddress,
+    paymentMethodName: cashAmount > 0 && transferAmount > 0 ? 'TM/CK' : transferAmount > 0 ? 'CK' : 'TM',
+    totalAmount,
+    discountAmount: type === 'SELL' ? discount : 0,
+    items: cart.map((item, index) => ({
+      itemCode: item.product.id?.slice(0, 8) || `HH${index + 1}`,
+      itemName: item.product.name,
+      unitName: item.product.unit,
+      quantity: item.quantity,
+      unitPrice: item.pricePerUnit,
+      totalAmount: item.pricePerUnit * item.quantity,
+    })),
+  });
+
+  const findPdfBase64 = (value: any): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      const cleaned = value.startsWith('data:application/pdf;base64,')
+        ? value.replace('data:application/pdf;base64,', '')
+        : value;
+      return cleaned.length > 200 && /^[A-Za-z0-9+/=\s]+$/.test(cleaned) ? cleaned.replace(/\s/g, '') : null;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findPdfBase64(item);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (typeof value === 'object') {
+      for (const key of ['fileContent', 'fileToBytes', 'pdfFile', 'pdfBase64', 'base64', 'data', 'result']) {
+        const found = findPdfBase64(value[key]);
+        if (found) return found;
+      }
+      for (const item of Object.values(value)) {
+        const found = findPdfBase64(item);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const openPreviewPdf = (data: any) => {
+    const pdfBase64 = findPdfBase64(data);
+    if (!pdfBase64) return false;
+    const bytes = Uint8Array.from(atob(pdfBase64), char => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return true;
+  };
+
+  const openInvoiceModal = () => {
+    if (type !== 'SELL') return;
+    if (cart.length === 0 || totalAmount <= 0) {
+      alert('Vui lòng thêm mặt hàng bán vàng trước khi xuất hóa đơn.');
+      return;
+    }
+    if (!customerName || !customerCCCD) {
+      alert('Vui lòng nhập tên khách hàng và CCCD/MST trước khi xuất hóa đơn.');
+      return;
+    }
+    setInvoiceResult(null);
+    setShowInvoiceModal(true);
+  };
+
+  const submitViettelInvoice = async (mode: 'preview' | 'draft') => {
+    setInvoiceLoading(mode);
+    setInvoiceResult(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/viettel-invoice', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ mode, payload: buildInvoicePayload() }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.errorCode || data.error) {
+        throw new Error(data.description || data.message || data.error || 'Viettel từ chối dữ liệu hóa đơn.');
+      }
+      if (mode === 'preview') {
+        const opened = openPreviewPdf(data);
+        setInvoiceResult({
+          success: true,
+          message: opened
+            ? 'Đã mở bản xem trước PDF ở tab mới. Dữ liệu không lưu vào SInvoice.'
+            : 'Đã tạo bản xem trước nhưng chưa nhận diện được file PDF trả về.',
+        });
+      } else {
+        setInvoiceResult({ success: true, message: 'Đã lập hóa đơn nháp trên Viettel. Kiểm tra mục hóa đơn chưa phát hành.' });
+      }
+    } catch (error: any) {
+      setInvoiceResult({ success: false, message: error.message });
+    } finally {
+      setInvoiceLoading(null);
     }
   };
 
