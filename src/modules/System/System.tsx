@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank } from '../../types';
+import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank, ViettelEInvoiceConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< Updated upstream
 import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye } from 'lucide-react';
+=======
+import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye, EyeOff } from 'lucide-react';
+>>>>>>> Stashed changes
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
+<<<<<<< Updated upstream
   const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup' | 'diagnostics' | 'veinvoice'>('prices');
   // Viettel eInvoice config state
   const [vConfig, setVConfig] = React.useState({
@@ -19,12 +24,19 @@ const System: React.FC = () => {
   const [vTesting, setVTesting] = React.useState(false);
   const [vShowPwd, setVShowPwd] = React.useState(false);
   const [vResult, setVResult] = React.useState<{ok: boolean; msg: string} | null>(null);
+=======
+  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'einvoice' | 'backup' | 'diagnostics'>('prices');
+>>>>>>> Stashed changes
 
   const tabs = [
     { id: 'prices', label: 'Giá Vàng', roles: ['ADMIN', 'SALES'] },
     { id: 'users', label: 'Nhân Viên', roles: ['ADMIN'] },
     { id: 'bank', label: 'Ngân Hàng', roles: ['ADMIN'] },
+<<<<<<< Updated upstream
     { id: 'veinvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
+=======
+    { id: 'einvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
+>>>>>>> Stashed changes
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
     { id: 'diagnostics', label: 'Kiểm Tra Kết Nối', roles: ['ADMIN'] },
   ];
@@ -51,6 +63,21 @@ const System: React.FC = () => {
   const [dbStatus, setDbStatus] = useState<{ loading: boolean; connected: boolean; message: string }>({ 
     loading: false, connected: false, message: 'Chưa thực hiện kiểm tra' 
   });
+  const [viettelConfig, setViettelConfig] = useState<ViettelEInvoiceConfig>({
+    username: '',
+    password: '',
+    tax_code: '',
+    api_url: 'https://api-vinvoice.viettel.vn',
+    template_code: '',
+    invoice_series: '',
+    is_sandbox: false,
+    company_name: '',
+    company_address: '',
+  });
+  const [savingViettel, setSavingViettel] = useState(false);
+  const [testingViettel, setTestingViettel] = useState(false);
+  const [showViettelPassword, setShowViettelPassword] = useState(false);
+  const [viettelResult, setViettelResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     setLastError(null);
@@ -58,9 +85,70 @@ const System: React.FC = () => {
     fetchConfig();
     fetchBanks();
     if (isAdmin || activeTab === 'users') fetchProfiles();
+    if (isAdmin && activeTab === 'einvoice') fetchViettelConfig();
     if (activeTab === 'diagnostics') checkConnection();
     if (activeTab === 'veinvoice') loadVConfig();
   }, [activeTab, isAdmin]);
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || ''}`,
+    };
+  };
+
+  const fetchViettelConfig = async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/viettel-config', { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.description || data.error || 'Không tải được cấu hình Viettel');
+      if (data.config) {
+        setViettelConfig(prev => ({ ...prev, ...data.config, password: '' }));
+      }
+    } catch (error: any) {
+      setViettelResult({ success: false, message: error.message });
+    }
+  };
+
+  const saveViettelConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingViettel(true);
+    setViettelResult(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/viettel-config', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(viettelConfig),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.description || data.error || 'Lưu cấu hình Viettel thất bại');
+      setViettelResult({ success: true, message: 'Đã lưu cấu hình hóa đơn điện tử.' });
+      await fetchViettelConfig();
+    } catch (error: any) {
+      setViettelResult({ success: false, message: error.message });
+    } finally {
+      setSavingViettel(false);
+    }
+  };
+
+  const testViettelConnection = async () => {
+    setTestingViettel(true);
+    setViettelResult(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/viettel-test', { method: 'POST', headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || data.description || 'Kiểm tra kết nối thất bại');
+      setViettelResult({ success: true, message: data.message });
+    } catch (error: any) {
+      setViettelResult({ success: false, message: error.message });
+    } finally {
+      setTestingViettel(false);
+    }
+  };
 
   const checkConnection = async () => {
     setDbStatus({ loading: true, connected: false, message: 'Đang kết nối tới database...' });
@@ -753,6 +841,151 @@ const System: React.FC = () => {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'einvoice' && isAdmin && (
+          <div className="flex flex-col gap-8 max-w-3xl">
+            <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
+              <FileText className="text-gold-primary" />
+              <div>
+                <h3 className="text-xl">Cấu hình hóa đơn điện tử Viettel</h3>
+                <p className="text-xs text-neutral-500 font-medium mt-1">Chỉ tài khoản ADMIN được lưu và kiểm tra cấu hình này.</p>
+              </div>
+            </div>
+
+            {viettelResult && (
+              <div className={`p-4 border-l-4 rounded-sm text-sm ${viettelResult.success ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}>
+                <p className="font-black uppercase text-[10px] tracking-widest mb-1">
+                  {viettelResult.success ? 'Thành công' : 'Lỗi cấu hình'}
+                </p>
+                <p>{viettelResult.message}</p>
+              </div>
+            )}
+
+            <form onSubmit={saveViettelConfig} className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="input-field">
+                  <label>Tài khoản Viettel</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.username}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, username: e.target.value }))}
+                    placeholder="Mã số thuế hoặc tài khoản vInvoice"
+                    required
+                  />
+                </div>
+                <div className="input-field">
+                  <label>Mật khẩu Viettel</label>
+                  <div className="relative">
+                    <input
+                      type={showViettelPassword ? 'text' : 'password'}
+                      value={viettelConfig.password}
+                      onChange={e => setViettelConfig(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder={viettelConfig._hasPassword ? '******** (đã lưu)' : 'Nhập mật khẩu'}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowViettelPassword(prev => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-ink"
+                    >
+                      {showViettelPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="input-field">
+                  <label>Mã số thuế phát hành</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.tax_code}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, tax_code: e.target.value }))}
+                    placeholder="4000926165"
+                    required
+                  />
+                </div>
+                <div className="input-field">
+                  <label>URL API Viettel</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.api_url}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, api_url: e.target.value }))}
+                    placeholder="https://api-vinvoice.viettel.vn"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="input-field">
+                  <label>Mẫu hóa đơn</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.template_code}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, template_code: e.target.value }))}
+                    placeholder="VD: 2"
+                  />
+                </div>
+                <div className="input-field">
+                  <label>Ký hiệu hóa đơn</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.invoice_series}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, invoice_series: e.target.value }))}
+                    placeholder="VD: 2C23MNT"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="input-field">
+                  <label>Tên doanh nghiệp</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.company_name}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, company_name: e.target.value }))}
+                    placeholder="CÔNG TY TNHH MỘT THÀNH VIÊN VÀNG BẠC NGHĨA TÍN"
+                    required
+                  />
+                </div>
+                <div className="input-field">
+                  <label>Địa chỉ doanh nghiệp</label>
+                  <input
+                    type="text"
+                    value={viettelConfig.company_address}
+                    onChange={e => setViettelConfig(prev => ({ ...prev, company_address: e.target.value }))}
+                    placeholder="Địa chỉ trên hồ sơ Viettel"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-3 p-4 bg-neutral-50 border border-neutral-100 rounded-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={viettelConfig.is_sandbox}
+                  onChange={e => setViettelConfig(prev => ({ ...prev, is_sandbox: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <span className="text-xs font-black uppercase tracking-widest text-neutral-600">Dùng môi trường sandbox/test</span>
+              </label>
+
+              <div className="flex flex-col md:flex-row gap-3">
+                <button type="submit" disabled={savingViettel} className="vcb-btn flex items-center justify-center gap-2 md:w-auto">
+                  <Save size={18} /> {savingViettel ? 'Đang lưu...' : 'Lưu cấu hình'}
+                </button>
+                <button
+                  type="button"
+                  onClick={testViettelConnection}
+                  disabled={testingViettel}
+                  className="border border-neutral-200 py-4 px-6 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:border-ink transition-all disabled:opacity-50"
+                >
+                  <RefreshCw size={18} className={testingViettel ? 'animate-spin' : ''} />
+                  {testingViettel ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
