@@ -53,6 +53,7 @@ const Transactions: React.FC = () => {
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [showInvoiceStep, setShowInvoiceStep] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
   const [invoiceLoading, setInvoiceLoading] = useState<boolean|string|null>(false);
   const [invoiceResult, setInvoiceResult] = useState<any>(null);
@@ -409,19 +410,23 @@ const Transactions: React.FC = () => {
       const { error } = await supabase.from('transactions').insert(transactions);
       if (error) throw error;
 
-      // Lưu data để xuất hóa đơn sau (lấy item đầu tiên)
+      // Lưu data hóa đơn từ giao dịch (tất cả items)
       if (type === 'SELL') {
-        const item = cart[0];
         setInvoiceData({
           buyerName: customerName,
           buyerIdNo: customerCCCD,
           buyerAddress: customerAddress || '',
-          itemName: item?.product?.name || '',
-          itemCode: item?.product?.id?.substring(0,8)?.toUpperCase() || 'HH',
-          unitName: item?.product?.unit || 'Cái',
-          unitPrice: item?.pricePerUnit || 0,
-          quantity: item?.quantity || 1,
-          paymentMethod: transferAmount > 0 && cashAmount > 0 ? 'TM/CK' : transferAmount > 0 ? 'CK' : 'TM',
+          paymentMethodName: transferAmount > 0 && cashAmount > 0 ? 'TM/CK' : transferAmount > 0 ? 'CK' : 'TM',
+          totalAmount,
+          discountAmount: discount || 0,
+          items: cart.map((item, idx) => ({
+            itemCode: item.product.id?.slice(0, 8) || `HH${idx + 1}`,
+            itemName: item.product.name,
+            unitName: item.product.unit,
+            quantity: item.quantity,
+            unitPrice: item.pricePerUnit,
+            totalAmount: item.pricePerUnit * item.quantity,
+          })),
         });
       }
       
@@ -476,6 +481,7 @@ const Transactions: React.FC = () => {
   };
 
   const resetForm = () => {
+    setShowInvoiceStep(false);
     setCustomerName('');
     setCustomerCCCD('');
     setCustomerAddress('');
@@ -1126,6 +1132,162 @@ const Transactions: React.FC = () => {
                 Xác nhận & Đóng
               </button>
             </motion.div>
+          ) : showInvoiceStep && invoiceData ? (
+            /* ── BƯỚC 3: FORM XUẤT HÓA ĐƠN ĐIỆN TỬ ── */
+            <motion.div
+              key="invoice-step"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-sm shadow-xl border-t-8 border-gold-primary overflow-hidden"
+            >
+              {/* Header */}
+              <div className="px-8 pt-8 pb-5 border-b border-neutral-100 flex items-center gap-4">
+                <div className="w-12 h-12 bg-gold-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <FileText size={24} className="text-gold-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black">Lập hóa đơn điện tử</h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">Kiểm tra thông tin trước khi xuất hóa đơn nháp</p>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-5">
+                {/* Thông tin người mua */}
+                <div className="border border-neutral-100 rounded-sm p-4 space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">Thông tin người mua</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-black mb-1">Tên khách hàng</p>
+                      <p className="font-bold">{invoiceData.buyerName || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-black mb-1">CCCD / MST</p>
+                      <p className="font-bold">{invoiceData.buyerIdNo || '—'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-black mb-1">Địa chỉ</p>
+                      <p className="font-medium text-neutral-600">{invoiceData.buyerAddress || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-black mb-1">Hình thức thanh toán</p>
+                      <p className="font-bold">{invoiceData.paymentMethodName}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Danh sách hàng hóa */}
+                <div className="border border-neutral-100 rounded-sm overflow-hidden">
+                  <div className="px-4 py-2.5 bg-neutral-50 border-b border-neutral-100">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">Hàng hóa / Dịch vụ</p>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-neutral-100 text-[10px] text-neutral-400 uppercase tracking-widest">
+                        <th className="text-left px-4 py-2 font-black">Tên hàng hóa</th>
+                        <th className="text-center px-3 py-2 font-black">ĐVT</th>
+                        <th className="text-center px-3 py-2 font-black">SL</th>
+                        <th className="text-right px-4 py-2 font-black">Đơn giá</th>
+                        <th className="text-right px-4 py-2 font-black">Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(invoiceData.items || []).map((item: any, idx: number) => (
+                        <tr key={idx} className="border-b border-neutral-50 last:border-0">
+                          <td className="px-4 py-3 font-medium">{item.itemName}</td>
+                          <td className="px-3 py-3 text-center text-neutral-500">{item.unitName}</td>
+                          <td className="px-3 py-3 text-center font-bold">{item.quantity}</td>
+                          <td className="px-4 py-3 text-right text-neutral-600">{Number(item.unitPrice).toLocaleString('vi-VN')}</td>
+                          <td className="px-4 py-3 text-right font-black">{Number(item.totalAmount).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="px-4 py-3 bg-neutral-50 border-t border-neutral-100 flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tổng tiền thanh toán</span>
+                    <span className="text-2xl font-black text-gold-primary">{Number(invoiceData.totalAmount).toLocaleString('vi-VN')}đ</span>
+                  </div>
+                </div>
+
+                {/* Kết quả */}
+                {invoiceResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                    className={`p-4 border-l-4 text-sm ${invoiceResult.success ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}
+                  >
+                    <p className="font-black text-[10px] uppercase tracking-widest mb-1">
+                      {invoiceResult.success ? '✓ Thành công' : '✗ Thất bại'}
+                    </p>
+                    <p className="font-medium">{invoiceResult.message}</p>
+                    {invoiceResult.success && (
+                      <p className="text-xs mt-2 opacity-75">Vào portal Viettel vInvoice để ký số và phát hành hóa đơn chính thức.</p>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* PDF Preview */}
+                {pdfUrl && (
+                  <div className="border border-neutral-200 rounded-sm overflow-hidden">
+                    <div className="px-4 py-2.5 bg-neutral-50 border-b border-neutral-100 flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Xem trước hóa đơn</p>
+                      <a href={pdfUrl} download="hoa-don-nhap.pdf"
+                        className="text-xs font-black uppercase tracking-widest text-gold-primary hover:underline">
+                        ↓ Tải PDF
+                      </a>
+                    </div>
+                    <iframe src={pdfUrl} className="w-full h-96" title="Xem trước hóa đơn" />
+                  </div>
+                )}
+
+                {/* 3 nút chức năng */}
+                <div className="flex gap-3 pt-2">
+                  {/* Hủy xuất HĐ */}
+                  <button
+                    onClick={() => { setShowInvoiceStep(false); setInvoiceResult(null); setPdfUrl(null); }}
+                    disabled={Boolean(invoiceLoading)}
+                    className="flex-1 py-3.5 border-2 border-neutral-200 text-neutral-500 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:border-red-300 hover:text-red-500 transition-all disabled:opacity-40"
+                  >
+                    <X size={14} /> Hủy xuất HĐ
+                  </button>
+
+                  {/* Xem trước */}
+                  <button
+                    onClick={() => submitViettelInvoice('preview')}
+                    disabled={Boolean(invoiceLoading)}
+                    className="flex-1 py-3.5 border-2 border-neutral-200 text-neutral-700 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:border-ink hover:bg-neutral-50 transition-all disabled:opacity-40"
+                  >
+                    {invoiceLoading === 'preview'
+                      ? <><span className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" /> Đang tải...</>
+                      : <><Eye size={14} /> Xem trước</>
+                    }
+                  </button>
+
+                  {/* Xuất HĐ nháp */}
+                  <button
+                    onClick={() => submitViettelInvoice('draft')}
+                    disabled={Boolean(invoiceLoading) || invoiceResult?.success}
+                    className="flex-1 py-3.5 bg-ink text-white font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-gold-primary hover:text-ink transition-all disabled:opacity-40"
+                  >
+                    {invoiceLoading === 'draft'
+                      ? <><span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang xuất...</>
+                      : invoiceResult?.success
+                        ? <><CheckCircle2 size={14} /> Đã xuất HĐ</>
+                        : <><FileText size={14} /> Xuất HĐ nháp</>
+                    }
+                  </button>
+                </div>
+
+                {/* Sau khi xuất thành công → nút tiếp tục */}
+                {invoiceResult?.success && (
+                  <button
+                    onClick={resetForm}
+                    className="w-full py-3.5 bg-green-600 text-white font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-green-700 transition-all"
+                  >
+                    <CheckCircle2 size={14} /> Hoàn tất — Giao dịch mới
+                  </button>
+                )}
+              </div>
+            </motion.div>
+
           ) : showSuccess ? (
             <motion.div 
               key="success"
@@ -1154,7 +1316,7 @@ const Transactions: React.FC = () => {
               
               {type === 'SELL' && isAdmin && invoiceData && (
                 <button
-                  onClick={() => setShowInvoice(true)}
+                  onClick={() => { setInvoiceResult(null); setPdfUrl(null); setShowInvoiceStep(true); }}
                   className="w-full py-4 bg-gold-primary text-ink font-black uppercase text-xs tracking-widest hover:opacity-90 transition-all shadow-md mb-3 flex items-center justify-center gap-2"
                 >
                   <FileText size={16} /> Xuất hóa đơn điện tử
@@ -1188,112 +1350,6 @@ const Transactions: React.FC = () => {
           onScan={(data) => handleScan(data, true)} 
           onClose={() => setShowScanner(false)} 
         />
-      )}
-
-      {/* Modal xuất hóa đơn điện tử */}
-      {showInvoice && invoiceData && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-sm shadow-2xl border-t-4 border-gold-primary">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-100">
-              <h3 className="font-black uppercase tracking-widest text-sm flex items-center gap-2">
-                <FileText size={18} className="text-gold-primary" /> Xuất hóa đơn điện tử
-              </h3>
-              <button onClick={() => { setShowInvoice(false); setInvoiceResult(null); setPdfUrl(null); }}
-                className="text-neutral-400 hover:text-neutral-700"><span className="text-xl">×</span></button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Preview thông tin */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-neutral-50 p-3 rounded-sm">
-                  <p className="text-neutral-400 font-black uppercase tracking-widest text-[10px] mb-1">Khách hàng</p>
-                  <p className="font-bold">{invoiceData.buyerName}</p>
-                  <p className="text-neutral-500">{invoiceData.buyerIdNo}</p>
-                </div>
-                <div className="bg-neutral-50 p-3 rounded-sm">
-                  <p className="text-neutral-400 font-black uppercase tracking-widest text-[10px] mb-1">Hàng hóa</p>
-                  <p className="font-bold">{invoiceData.itemName}</p>
-                  <p className="text-neutral-500">{invoiceData.quantity} {invoiceData.unitName} × {Number(invoiceData.unitPrice).toLocaleString('vi-VN')}đ</p>
-                </div>
-              </div>
-              <div className="flex justify-between items-center py-3 border-t border-b border-neutral-100">
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tổng tiền</span>
-                <span className="text-2xl font-black text-gold-primary">
-                  {(invoiceData.quantity * invoiceData.unitPrice).toLocaleString('vi-VN')}đ
-                </span>
-              </div>
-
-              {/* Kết quả */}
-              {invoiceResult && (
-                <div className={`p-3 text-sm border-l-4 ${invoiceResult.success ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}>
-                  <p className="font-bold">{invoiceResult.success ? '✓ Thành công!' : '✗ Thất bại'}</p>
-                  {invoiceResult.invoiceNo && <p className="text-xs mt-1">Số HĐ: <strong>{invoiceResult.invoiceNo}</strong></p>}
-                  {invoiceResult.error && <p className="text-xs mt-1">{invoiceResult.error}</p>}
-                </div>
-              )}
-
-              {/* PDF Preview */}
-              {pdfUrl && (
-                <div className="border border-neutral-200 rounded-sm overflow-hidden">
-                  <iframe src={pdfUrl} className="w-full h-96" title="Xem trước hóa đơn" />
-                  <div className="p-2 text-center">
-                    <a href={pdfUrl} download="hoa-don-nhap.pdf"
-                      className="text-xs font-black uppercase tracking-widest text-gold-primary hover:underline">
-                      ↓ Tải PDF
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  disabled={Boolean(invoiceLoading)}
-                  onClick={async () => {
-                    setInvoiceLoading(true); setInvoiceResult(null); setPdfUrl(null);
-                    try {
-                      const r = await fetch('/api/viettel?action=preview', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(invoiceData),
-                      });
-                      const d = await r.json();
-                      if (d.success && d.pdfBase64) {
-                        const blob = new Blob([Uint8Array.from(atob(d.pdfBase64), c => c.charCodeAt(0))], { type: 'application/pdf' });
-                        setPdfUrl(URL.createObjectURL(blob));
-                      } else {
-                        setInvoiceResult({ success: false, error: d.error || 'Không lấy được PDF preview' });
-                      }
-                    } catch(e: any) { setInvoiceResult({ success: false, error: e.message }); }
-                    finally { setInvoiceLoading(false); }
-                  }}
-                  className="flex-1 py-3 border border-neutral-300 text-neutral-700 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-neutral-50 transition-all disabled:opacity-50"
-                >
-                  {invoiceLoading ? '...' : <><Eye size={14} /> Xem trước</>}
-                </button>
-                <button
-                  disabled={Boolean(invoiceLoading)}
-                  onClick={async () => {
-                    setInvoiceLoading(true); setInvoiceResult(null);
-                    try {
-                      const r = await fetch('/api/viettel?action=create', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(invoiceData),
-                      });
-                      const d = await r.json();
-                      setInvoiceResult({ success: d.success || (!d.error), invoiceNo: d.invoiceNo, error: d.error });
-                    } catch(e: any) { setInvoiceResult({ success: false, error: e.message }); }
-                    finally { setInvoiceLoading(false); }
-                  }}
-                  className="flex-1 py-3 bg-ink text-white font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-gold-primary hover:text-ink transition-all disabled:opacity-50"
-                >
-                  {invoiceLoading ? '...' : <><FileText size={14} /> Xuất HĐ nháp</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
       </div>
     </div>
