@@ -908,15 +908,6 @@ const System: React.FC = () => {
                 </div>
               </div>
 
-              <label className="flex items-center gap-3 p-4 bg-neutral-50 border border-neutral-100 rounded-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={viettelConfig.is_sandbox}
-                  onChange={e => setViettelConfig(prev => ({ ...prev, is_sandbox: e.target.checked }))}
-                  className="w-4 h-4"
-                />
-                <span className="text-xs font-black uppercase tracking-widest text-neutral-600">Dùng môi trường sandbox/test</span>
-              </label>
 
               <div className="flex flex-col md:flex-row gap-3">
                 <button type="submit" disabled={savingViettel} className="vcb-btn flex items-center justify-center gap-2 md:w-auto">
