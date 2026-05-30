@@ -99,9 +99,6 @@ function safeJsonParse(body: string): any | null {
 // ── Viettel URL Helpers ───────────────────────────────────────────────────────
 export function getViettelOrigin(cfg: any): string {
   let origin = (cfg.api_url || 'https://api-vinvoice.viettel.vn').toString().trim().replace(/\/+$|\s+/g, '');
-  if (cfg.is_sandbox && (!cfg.api_url || origin === 'https://api-vinvoice.viettel.vn')) {
-    origin = 'https://api-sandbox-vinvoice.viettel.vn';
-  }
   try { return new URL(origin).origin; }
   catch { return origin; }
 }

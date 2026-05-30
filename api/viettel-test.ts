@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
     if (auth.token) {
       return res.json({
         success: true,
-        message: `Ket noi Viettel vInvoice thanh cong. Xac thuc Token OK. Tai khoan: ${cfg.username} | MST: ${cfg.tax_code} | Moi truong: ${cfg.is_sandbox ? 'Sandbox' : 'Production'}`,
+        message: `Ket noi Viettel vInvoice thanh cong. Xac thuc Token OK. Tai khoan: ${cfg.username} | MST: ${cfg.tax_code} | Moi truong: Production`,
       });
     }
     if (auth.status === 401 || auth.status === 403) {

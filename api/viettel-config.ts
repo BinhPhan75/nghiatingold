@@ -39,7 +39,7 @@ export default async function handler(req: any, res: any) {
       api_url: String(body.api_url || 'https://api-vinvoice.viettel.vn').trim().replace(/\/+$/, ''),
       template_code: String(body.template_code || '').trim(),
       invoice_series: String(body.invoice_series || '').trim(),
-      is_sandbox: body.is_sandbox === true,
+      is_sandbox: false,
       company_name: String(body.company_name || '').trim(),
       company_address: String(body.company_address || '').trim(),
       updated_at: new Date().toISOString(),

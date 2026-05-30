@@ -74,14 +74,26 @@ const System: React.FC = () => {
     };
   };
 
+  const readApiResponse = async (res: Response) => {
+    const text = await res.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {
+        error: text.length > 300 ? `${text.slice(0, 300)}...` : text,
+      };
+    }
+  };
+
   const fetchViettelConfig = async () => {
     try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/viettel-config', { headers });
-      const data = await res.json();
+      const data = await readApiResponse(res);
       if (!res.ok) throw new Error(data.description || data.error || 'Không tải được cấu hình Viettel');
       if (data.config) {
-        setViettelConfig(prev => ({ ...prev, ...data.config, password: '' }));
+        setViettelConfig(prev => ({ ...prev, ...data.config, password: '', is_sandbox: false }));
       }
     } catch (error: any) {
       setViettelResult({ success: false, message: error.message });
@@ -97,9 +109,9 @@ const System: React.FC = () => {
       const res = await fetch('/api/viettel-config', {
         method: 'POST',
         headers,
-        body: JSON.stringify(viettelConfig),
+        body: JSON.stringify({ ...viettelConfig, is_sandbox: false }),
       });
-      const data = await res.json();
+      const data = await readApiResponse(res);
       if (!res.ok || !data.success) throw new Error(data.description || data.error || 'Lưu cấu hình Viettel thất bại');
       setViettelResult({ success: true, message: 'Đã lưu cấu hình hóa đơn điện tử.' });
       await fetchViettelConfig();
@@ -116,7 +128,7 @@ const System: React.FC = () => {
     try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/viettel-test', { method: 'POST', headers });
-      const data = await res.json();
+      const data = await readApiResponse(res);
       if (!res.ok || !data.success) throw new Error(data.message || data.description || 'Kiểm tra kết nối thất bại');
       setViettelResult({ success: true, message: data.message });
     } catch (error: any) {
@@ -903,16 +915,6 @@ const System: React.FC = () => {
                   />
                 </div>
               </div>
-
-              <label className="flex items-center gap-3 p-4 bg-neutral-50 border border-neutral-100 rounded-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={viettelConfig.is_sandbox}
-                  onChange={e => setViettelConfig(prev => ({ ...prev, is_sandbox: e.target.checked }))}
-                  className="w-4 h-4"
-                />
-                <span className="text-xs font-black uppercase tracking-widest text-neutral-600">Dùng môi trường sandbox/test</span>
-              </label>
 
               <div className="flex flex-col md:flex-row gap-3">
                 <button type="submit" disabled={savingViettel} className="vcb-btn flex items-center justify-center gap-2 md:w-auto">
