@@ -222,6 +222,3 @@ export function buildViettelInvoicePayload(cfg: any, payload: any) {
   return { transactionUuid: uniqueId, data };
 }
 
-export function sendMethodNotAllowed(res: any) {
-  return res.status(405).json({ errorCode: 'METHOD_NOT_ALLOWED', description: 'Method not allowed.' });
-}
