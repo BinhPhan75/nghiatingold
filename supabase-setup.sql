@@ -114,12 +114,29 @@ CREATE TABLE IF NOT EXISTS public.system_config (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 5b. Viettel eInvoice Config (ADMIN only)
+CREATE TABLE IF NOT EXISTS public.viettel_einvoice_config (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  username TEXT NOT NULL DEFAULT '',
+  password TEXT NOT NULL DEFAULT '',
+  tax_code TEXT NOT NULL DEFAULT '',
+  api_url TEXT NOT NULL DEFAULT 'https://api-vinvoice.viettel.vn',
+  template_code TEXT NOT NULL DEFAULT '',
+  invoice_series TEXT NOT NULL DEFAULT '',
+  is_sandbox BOOLEAN NOT NULL DEFAULT FALSE,
+  company_name TEXT NOT NULL DEFAULT '',
+  company_address TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 6. Logic
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.banks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.viettel_einvoice_config ENABLE ROW LEVEL SECURITY;
 
 -- Basic Policies (Modify for production)
 CREATE POLICY "Public read profiles" ON public.profiles FOR SELECT USING (true);
@@ -128,3 +145,24 @@ CREATE POLICY "Public read banks" ON public.banks FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can create transactions" ON public.transactions FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "Authenticated users can read transactions" ON public.transactions FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "Public read system_config" ON public.system_config FOR SELECT USING (true);
+
+CREATE POLICY "Admins can read viettel_einvoice_config" ON public.viettel_einvoice_config
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid() AND profiles.role = 'ADMIN'
+  )
+);
+
+CREATE POLICY "Admins can write viettel_einvoice_config" ON public.viettel_einvoice_config
+FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid() AND profiles.role = 'ADMIN'
+  )
+) WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid() AND profiles.role = 'ADMIN'
+  )
+);

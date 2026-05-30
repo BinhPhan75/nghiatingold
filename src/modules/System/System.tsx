@@ -2,41 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank, ViettelEInvoiceConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-<<<<<<< Updated upstream
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye } from 'lucide-react';
-=======
 import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye, EyeOff } from 'lucide-react';
->>>>>>> Stashed changes
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-<<<<<<< Updated upstream
-  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup' | 'diagnostics' | 'veinvoice'>('prices');
-  // Viettel eInvoice config state
-  const [vConfig, setVConfig] = React.useState({
-    username: '', password: '', tax_code: '', api_url: 'https://api-vinvoice.viettel.vn',
-    template_code: '', invoice_series: '', is_sandbox: true, company_name: '', company_address: '',
-    _hasPassword: false,
-  });
-  const [vConfigLoading, setVConfigLoading] = React.useState(false);
-  const [vSaving, setVSaving] = React.useState(false);
-  const [vTesting, setVTesting] = React.useState(false);
-  const [vShowPwd, setVShowPwd] = React.useState(false);
-  const [vResult, setVResult] = React.useState<{ok: boolean; msg: string} | null>(null);
-=======
   const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'einvoice' | 'backup' | 'diagnostics'>('prices');
->>>>>>> Stashed changes
 
   const tabs = [
     { id: 'prices', label: 'Giá Vàng', roles: ['ADMIN', 'SALES'] },
     { id: 'users', label: 'Nhân Viên', roles: ['ADMIN'] },
     { id: 'bank', label: 'Ngân Hàng', roles: ['ADMIN'] },
-<<<<<<< Updated upstream
-    { id: 'veinvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
-=======
     { id: 'einvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
->>>>>>> Stashed changes
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
     { id: 'diagnostics', label: 'Kiểm Tra Kết Nối', roles: ['ADMIN'] },
   ];
@@ -87,7 +64,6 @@ const System: React.FC = () => {
     if (isAdmin || activeTab === 'users') fetchProfiles();
     if (isAdmin && activeTab === 'einvoice') fetchViettelConfig();
     if (activeTab === 'diagnostics') checkConnection();
-    if (activeTab === 'veinvoice') loadVConfig();
   }, [activeTab, isAdmin]);
 
   const getAuthHeaders = async () => {
@@ -382,39 +358,6 @@ const System: React.FC = () => {
 
   const parseNumberFromSeparator = (val: string) => {
     return Number(val.replace(/\./g, ''));
-  };
-
-  const loadVConfig = async () => {
-    setVConfigLoading(true);
-    try {
-      const r = await fetch('/api/viettel?action=config');
-      const d = await r.json();
-      if (d.config) setVConfig({ username:'',password:'',...d.config });
-    } catch(e) { console.warn('loadVConfig error', e); }
-    finally { setVConfigLoading(false); }
-  };
-
-  const saveVConfig = async () => {
-    if (!vConfig.username || !vConfig.tax_code) { setVResult({ok:false,msg:'Vui lòng điền Tài khoản và Mã số thuế'}); return; }
-    if (!vConfig.password && !vConfig._hasPassword) { setVResult({ok:false,msg:'Vui lòng điền Mật khẩu'}); return; }
-    setVSaving(true); setVResult(null);
-    try {
-      const r = await fetch('/api/viettel?action=config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(vConfig) });
-      const d = await r.json();
-      if (d.success) { setVResult({ok:true,msg:'Đã lưu cấu hình thành công!'}); await loadVConfig(); }
-      else setVResult({ok:false, msg: d.error || 'Lưu thất bại'});
-    } catch(e:any) { setVResult({ok:false,msg:e.message}); }
-    finally { setVSaving(false); }
-  };
-
-  const testVConfig = async () => {
-    setVTesting(true); setVResult(null);
-    try {
-      const r = await fetch('/api/viettel?action=test', { method:'POST' });
-      const d = await r.json();
-      setVResult({ok: d.success, msg: d.message || d.error || 'Không có phản hồi'});
-    } catch(e:any) { setVResult({ok:false, msg:e.message}); }
-    finally { setVTesting(false); }
   };
 
   return (
@@ -1063,111 +1006,6 @@ const System: React.FC = () => {
             >
               Thử kết nối lại
             </button>
-          </div>
-        )}
-
-        {activeTab === 'veinvoice' && (
-          <div className="flex flex-col gap-6 max-w-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-              <div className="flex items-center gap-3">
-                <FileText className="text-gold-primary" />
-                <h3 className="text-xl">Cấu hình Hóa đơn điện tử Viettel</h3>
-              </div>
-              <div className={`text-[10px] font-black px-3 py-1 rounded-full ${vConfig._hasPassword && vConfig.username ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}>
-                {vConfig._hasPassword && vConfig.username ? '● ĐÃ CẤU HÌNH' : '○ CHƯA CẤU HÌNH'}
-              </div>
-            </div>
-
-            {vConfigLoading ? (
-              <div className="text-sm text-neutral-400 animate-pulse py-4">Đang tải cấu hình...</div>
-            ) : (
-              <>
-                {/* Toggle Sandbox */}
-                <div className="flex items-center justify-between p-4 bg-paper border border-neutral-100 rounded-sm">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest">Môi trường</p>
-                    <p className="text-[11px] text-neutral-400 mt-0.5">{vConfig.is_sandbox ? 'Đang dùng Sandbox (test)' : 'Đang dùng Production (thật)'}</p>
-                  </div>
-                  <button onClick={() => setVConfig(p => ({...p, is_sandbox: !p.is_sandbox}))}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${vConfig.is_sandbox ? 'bg-amber-400' : 'bg-green-500'}`}>
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${vConfig.is_sandbox ? 'left-1' : 'left-7'}`} />
-                  </button>
-                </div>
-
-                {/* Thông tin đăng nhập */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Tài khoản đăng nhập *</label>
-                    <input className="input-field" placeholder="Thường là Mã số thuế"
-                      value={vConfig.username} onChange={e => setVConfig(p => ({...p, username: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Mật khẩu *</label>
-                    <div className="relative">
-                      <input type={vShowPwd ? 'text' : 'password'} className="input-field pr-10"
-                        placeholder={vConfig._hasPassword ? '••••••••  (đã lưu)' : 'Nhập mật khẩu'}
-                        value={vConfig.password} onChange={e => setVConfig(p => ({...p, password: e.target.value}))} />
-                      <button type="button" onClick={() => setVShowPwd(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700">
-                        <Eye size={15} />
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Mã số thuế *</label>
-                    <input className="input-field" placeholder="VD: 4000926165"
-                      value={vConfig.tax_code} onChange={e => setVConfig(p => ({...p, tax_code: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">URL API</label>
-                    <input className="input-field" placeholder="https://api-vinvoice.viettel.vn"
-                      value={vConfig.api_url} onChange={e => setVConfig(p => ({...p, api_url: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Mẫu số hóa đơn</label>
-                    <input className="input-field" placeholder="VD: 2/002"
-                      value={vConfig.template_code} onChange={e => setVConfig(p => ({...p, template_code: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Ký hiệu hóa đơn</label>
-                    <input className="input-field" placeholder="VD: C26MNT"
-                      value={vConfig.invoice_series} onChange={e => setVConfig(p => ({...p, invoice_series: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Tên doanh nghiệp</label>
-                    <input className="input-field" placeholder="Tên công ty"
-                      value={vConfig.company_name} onChange={e => setVConfig(p => ({...p, company_name: e.target.value}))} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Địa chỉ</label>
-                    <input className="input-field" placeholder="Địa chỉ doanh nghiệp"
-                      value={vConfig.company_address} onChange={e => setVConfig(p => ({...p, company_address: e.target.value}))} />
-                  </div>
-                </div>
-
-                {/* Kết quả */}
-                {vResult && (
-                  <div className={`p-4 text-sm flex items-start gap-3 border-l-4 ${vResult.ok ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}>
-                    {vResult.ok ? <CheckCircle size={18} className="shrink-0 mt-0.5" /> : <XCircle size={18} className="shrink-0 mt-0.5" />}
-                    <span className="font-medium">{vResult.msg}</span>
-                  </div>
-                )}
-
-                {/* Buttons */}
-                <div className="flex gap-3">
-                  <button onClick={saveVConfig} disabled={vSaving}
-                    className="vcb-btn flex items-center gap-2 disabled:opacity-60">
-                    {vSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                    {vSaving ? 'Đang lưu...' : 'Lưu cấu hình'}
-                  </button>
-                  <button onClick={testVConfig} disabled={vTesting}
-                    className="py-3 px-6 border border-neutral-200 text-neutral-700 font-black uppercase text-xs tracking-widest flex items-center gap-2 hover:bg-neutral-50 transition-all disabled:opacity-60">
-                    {vTesting ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    {vTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         )}
       </div>

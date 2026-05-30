@@ -3,11 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-<<<<<<< Updated upstream
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye } from 'lucide-react';
-=======
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye, Loader2 } from 'lucide-react';
->>>>>>> Stashed changes
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR, generateEMVCoQR, getRawQRUrl } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,7 +11,6 @@ import { motion, AnimatePresence } from 'motion/react';
 const Transactions: React.FC = () => {
   const { profile, isAdmin, user } = useAuth();
   const [searchParams] = useSearchParams();
-  const { isAdmin } = useAuth();
   const initialType = searchParams.get('type') === 'BUY' ? 'BUY' : 'SELL';
   const [type, setType] = useState<'BUY' | 'SELL'>(initialType);
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,17 +52,9 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-<<<<<<< Updated upstream
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [invoiceData, setInvoiceData] = useState<any>(null);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [invoiceResult, setInvoiceResult] = useState<any>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-=======
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState<'preview' | 'draft' | null>(null);
   const [invoiceResult, setInvoiceResult] = useState<any>(null);
->>>>>>> Stashed changes
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -420,22 +407,6 @@ const Transactions: React.FC = () => {
       const { error } = await supabase.from('transactions').insert(transactions);
       if (error) throw error;
 
-      // Lưu data để xuất hóa đơn sau (lấy item đầu tiên)
-      if (type === 'SELL') {
-        const item = cart[0];
-        setInvoiceData({
-          buyerName: customerName,
-          buyerIdNo: customerCCCD,
-          buyerAddress: customerAddress || '',
-          itemName: item?.product?.name || '',
-          itemCode: item?.product?.id?.substring(0,8)?.toUpperCase() || 'HH',
-          unitName: item?.product?.unit || 'Cái',
-          unitPrice: item?.pricePerUnit || 0,
-          quantity: item?.quantity || 1,
-          paymentMethod: transferAmount > 0 && cashAmount > 0 ? 'TM/CK' : transferAmount > 0 ? 'CK' : 'TM',
-        });
-      }
-      
       // Synchronized Memo Content Logic (Matches visual display and bank requirements)
       const memoSummary = cart.map(item => `${item.product.name} X ${item.quantity}`).join(' ');
       const memoDesc = type === 'SELL' 
@@ -1163,9 +1134,9 @@ const Transactions: React.FC = () => {
                 )}
               </p>
               
-              {type === 'SELL' && isAdmin && invoiceData && (
+              {type === 'SELL' && isAdmin && (
                 <button
-                  onClick={() => setShowInvoice(true)}
+                  onClick={openInvoiceModal}
                   className="w-full py-4 bg-gold-primary text-ink font-black uppercase text-xs tracking-widest hover:opacity-90 transition-all shadow-md mb-3 flex items-center justify-center gap-2"
                 >
                   <FileText size={16} /> Xuất hóa đơn điện tử
@@ -1201,105 +1172,61 @@ const Transactions: React.FC = () => {
         />
       )}
 
-      {/* Modal xuất hóa đơn điện tử */}
-      {showInvoice && invoiceData && (
+      {showInvoiceModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-sm shadow-2xl border-t-4 border-gold-primary">
             <div className="flex items-center justify-between p-6 border-b border-neutral-100">
               <h3 className="font-black uppercase tracking-widest text-sm flex items-center gap-2">
                 <FileText size={18} className="text-gold-primary" /> Xuất hóa đơn điện tử
               </h3>
-              <button onClick={() => { setShowInvoice(false); setInvoiceResult(null); setPdfUrl(null); }}
+              <button onClick={() => { setShowInvoiceModal(false); setInvoiceResult(null); }}
                 className="text-neutral-400 hover:text-neutral-700"><span className="text-xl">×</span></button>
             </div>
 
             <div className="p-6 space-y-4">
-              {/* Preview thông tin */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-neutral-50 p-3 rounded-sm">
                   <p className="text-neutral-400 font-black uppercase tracking-widest text-[10px] mb-1">Khách hàng</p>
-                  <p className="font-bold">{invoiceData.buyerName}</p>
-                  <p className="text-neutral-500">{invoiceData.buyerIdNo}</p>
+                  <p className="font-bold">{customerName}</p>
+                  <p className="text-neutral-500">{customerCCCD}</p>
                 </div>
                 <div className="bg-neutral-50 p-3 rounded-sm">
-                  <p className="text-neutral-400 font-black uppercase tracking-widest text-[10px] mb-1">Hàng hóa</p>
-                  <p className="font-bold">{invoiceData.itemName}</p>
-                  <p className="text-neutral-500">{invoiceData.quantity} {invoiceData.unitName} × {Number(invoiceData.unitPrice).toLocaleString('vi-VN')}đ</p>
+                  <p className="text-neutral-400 font-black uppercase tracking-widest text-[10px] mb-1">Số mặt hàng</p>
+                  <p className="font-bold">{cart.length} dòng</p>
+                  <p className="text-neutral-500">Chiết khấu: {formatCurrency(type === 'SELL' ? discount : 0)}</p>
                 </div>
               </div>
               <div className="flex justify-between items-center py-3 border-t border-b border-neutral-100">
                 <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tổng tiền</span>
                 <span className="text-2xl font-black text-gold-primary">
-                  {(invoiceData.quantity * invoiceData.unitPrice).toLocaleString('vi-VN')}đ
+                  {formatCurrency(totalAmount)}
                 </span>
               </div>
 
-              {/* Kết quả */}
               {invoiceResult && (
                 <div className={`p-3 text-sm border-l-4 ${invoiceResult.success ? 'bg-green-50 border-green-500 text-green-800' : 'bg-red-50 border-red-500 text-red-800'}`}>
-                  <p className="font-bold">{invoiceResult.success ? '✓ Thành công!' : '✗ Thất bại'}</p>
+                  <p className="font-bold">{invoiceResult.success ? 'Thành công' : 'Thất bại'}</p>
                   {invoiceResult.invoiceNo && <p className="text-xs mt-1">Số HĐ: <strong>{invoiceResult.invoiceNo}</strong></p>}
-                  {invoiceResult.error && <p className="text-xs mt-1">{invoiceResult.error}</p>}
+                  {(invoiceResult.message || invoiceResult.error) && <p className="text-xs mt-1">{invoiceResult.message || invoiceResult.error}</p>}
                 </div>
               )}
 
-              {/* PDF Preview */}
-              {pdfUrl && (
-                <div className="border border-neutral-200 rounded-sm overflow-hidden">
-                  <iframe src={pdfUrl} className="w-full h-96" title="Xem trước hóa đơn" />
-                  <div className="p-2 text-center">
-                    <a href={pdfUrl} download="hoa-don-nhap.pdf"
-                      className="text-xs font-black uppercase tracking-widest text-gold-primary hover:underline">
-                      ↓ Tải PDF
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Buttons */}
               <div className="flex gap-3 pt-2">
                 <button
-                  disabled={invoiceLoading}
-                  onClick={async () => {
-                    setInvoiceLoading(true); setInvoiceResult(null); setPdfUrl(null);
-                    try {
-                      const r = await fetch('/api/viettel?action=preview', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(invoiceData),
-                      });
-                      const d = await r.json();
-                      if (d.success && d.pdfBase64) {
-                        const blob = new Blob([Uint8Array.from(atob(d.pdfBase64), c => c.charCodeAt(0))], { type: 'application/pdf' });
-                        setPdfUrl(URL.createObjectURL(blob));
-                      } else {
-                        setInvoiceResult({ success: false, error: d.error || 'Không lấy được PDF preview' });
-                      }
-                    } catch(e: any) { setInvoiceResult({ success: false, error: e.message }); }
-                    finally { setInvoiceLoading(false); }
-                  }}
+                  disabled={invoiceLoading !== null}
+                  onClick={() => submitViettelInvoice('preview')}
                   className="flex-1 py-3 border border-neutral-300 text-neutral-700 font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-neutral-50 transition-all disabled:opacity-50"
                 >
-                  {invoiceLoading ? '...' : <><Eye size={14} /> Xem trước</>}
+                  {invoiceLoading === 'preview' ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                  Xem trước
                 </button>
                 <button
-                  disabled={invoiceLoading}
-                  onClick={async () => {
-                    setInvoiceLoading(true); setInvoiceResult(null);
-                    try {
-                      const r = await fetch('/api/viettel?action=create', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(invoiceData),
-                      });
-                      const d = await r.json();
-                      setInvoiceResult({ success: d.success || (!d.error), invoiceNo: d.invoiceNo, error: d.error });
-                    } catch(e: any) { setInvoiceResult({ success: false, error: e.message }); }
-                    finally { setInvoiceLoading(false); }
-                  }}
+                  disabled={invoiceLoading !== null}
+                  onClick={() => submitViettelInvoice('draft')}
                   className="flex-1 py-3 bg-ink text-white font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-gold-primary hover:text-ink transition-all disabled:opacity-50"
                 >
-                  {invoiceLoading ? '...' : <><FileText size={14} /> Xuất HĐ nháp</>}
+                  {invoiceLoading === 'draft' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                  Xuất HĐ nháp
                 </button>
               </div>
             </div>

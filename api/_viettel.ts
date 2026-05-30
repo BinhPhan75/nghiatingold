@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import https from 'https';
 import http from 'http';
@@ -19,7 +18,11 @@ function getUserSupabase(token: string) {
   });
 }
 
-async function requireAdmin(req: any, res: any) {
+export function sendMethodNotAllowed(res: any) {
+  return res.status(405).json({ errorCode: 'METHOD_NOT_ALLOWED', description: 'Method not allowed.' });
+}
+
+export async function requireAdmin(req: any, res: any) {
   if (!supabaseUrl || !supabaseAnonKey) {
     res.status(500).json({ errorCode: 'SUPABASE_NOT_CONFIGURED', description: 'Server missing Supabase env vars.' });
     return null;
@@ -49,7 +52,7 @@ async function requireAdmin(req: any, res: any) {
 }
 
 // ── Network Helper ────────────────────────────────────────────────────────────
-function nodeRequest(
+export function nodeRequest(
   urlStr: string,
   options: { method: string; headers: Record<string, string>; body?: string; timeoutMs?: number }
 ): Promise<{ status: number; body: string }> {
@@ -94,7 +97,7 @@ function safeJsonParse(body: string): any | null {
 }
 
 // ── Viettel URL Helpers ───────────────────────────────────────────────────────
-function getViettelOrigin(cfg: any): string {
+export function getViettelOrigin(cfg: any): string {
   let origin = (cfg.api_url || 'https://api-vinvoice.viettel.vn').toString().trim().replace(/\/+$|\s+/g, '');
   if (cfg.is_sandbox && (!cfg.api_url || origin === 'https://api-vinvoice.viettel.vn')) {
     origin = 'https://api-sandbox-vinvoice.viettel.vn';
@@ -103,7 +106,7 @@ function getViettelOrigin(cfg: any): string {
   catch { return origin; }
 }
 
-function getViettelApiBase(cfg: any): string {
+export function getViettelApiBase(cfg: any): string {
   const raw = (cfg.api_url || 'https://api-vinvoice.viettel.vn').toString().trim().replace(/\/+$/, '');
   const origin = getViettelOrigin(cfg);
   try {
@@ -125,7 +128,7 @@ function extractViettelAccessToken(data: any): string {
   );
 }
 
-async function loginViettel(cfg: any): Promise<{ token: string; status: number; message: string }> {
+export async function loginViettel(cfg: any): Promise<{ token: string; status: number; message: string }> {
   const loginRes = await nodeRequest(`${getViettelOrigin(cfg)}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -172,7 +175,7 @@ function numberToVietnameseWords(amount: number): string {
 }
 
 // ── Build Invoice Payload ─────────────────────────────────────────────────────
-function buildViettelInvoicePayload(cfg: any, payload: any) {
+export function buildViettelInvoicePayload(cfg: any, payload: any) {
   const transactionUuid = crypto.randomUUID();
   const total = Number(payload.totalAmount || 0);
   return {
@@ -229,280 +232,4 @@ function buildViettelInvoicePayload(cfg: any, payload: any) {
       taxBreakdowns: [{ taxPercentage: 0, taxableAmount: total, taxAmount: 0 }],
     },
   };
-}
-
-// ── DB Helpers ────────────────────────────────────────────────────────────────
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 3,
-});
-
-async function ensureTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS viettel_einvoice_config (
-      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      username        TEXT NOT NULL DEFAULT '',
-      password        TEXT NOT NULL DEFAULT '',
-      tax_code        TEXT NOT NULL DEFAULT '',
-      api_url         TEXT NOT NULL DEFAULT 'https://api-vinvoice.viettel.vn',
-      template_code   TEXT NOT NULL DEFAULT '',
-      invoice_series  TEXT NOT NULL DEFAULT '',
-      is_sandbox      BOOLEAN NOT NULL DEFAULT TRUE,
-      company_name    TEXT NOT NULL DEFAULT '',
-      company_address TEXT NOT NULL DEFAULT '',
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-}
-
-async function getConfig() {
-  await ensureTable();
-  const r = await pool.query('SELECT * FROM viettel_einvoice_config ORDER BY updated_at DESC LIMIT 1');
-  return r.rows[0] || null;
-}
-
-// ── Main Handler ──────────────────────────────────────────────────────────────
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const action = (req.query.action as string) || '';
-
-  // ── GET config ───────────────────────────────────────────────────────────
-  if (req.method === 'GET' && action === 'config') {
-    try {
-      const cfg = await getConfig();
-      if (!cfg) return res.json({ config: null });
-      return res.json({
-        config: {
-          ...cfg,
-          password: cfg.password ? '••••••••' : '',
-          _hasPassword: Boolean(cfg.password),
-        },
-      });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
-  // ── POST config ──────────────────────────────────────────────────────────
-  if (req.method === 'POST' && action === 'config') {
-    const {
-      username, password, tax_code, api_url,
-      template_code, invoice_series, is_sandbox,
-      company_name, company_address,
-    } = req.body || {};
-    if (!username || !tax_code) {
-      return res.status(400).json({ error: 'Thiếu username hoặc mã số thuế' });
-    }
-    try {
-      await ensureTable();
-      const existing = await pool.query(
-        'SELECT password FROM viettel_einvoice_config ORDER BY updated_at DESC LIMIT 1'
-      );
-      const finalPwd =
-        password && !password.startsWith('•')
-          ? password
-          : existing.rows[0]?.password || '';
-      const fixedId = '00000000-0000-0000-0000-000000000001';
-      await pool.query(
-        `INSERT INTO viettel_einvoice_config
-          (id,username,password,tax_code,api_url,template_code,invoice_series,is_sandbox,company_name,company_address,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
-         ON CONFLICT (id) DO UPDATE SET
-           username=EXCLUDED.username, password=EXCLUDED.password, tax_code=EXCLUDED.tax_code,
-           api_url=EXCLUDED.api_url, template_code=EXCLUDED.template_code,
-           invoice_series=EXCLUDED.invoice_series, is_sandbox=EXCLUDED.is_sandbox,
-           company_name=EXCLUDED.company_name, company_address=EXCLUDED.company_address,
-           updated_at=NOW()`,
-        [
-          fixedId,
-          username.trim(),
-          finalPwd,
-          tax_code.trim(),
-          (api_url || 'https://api-vinvoice.viettel.vn').trim().replace(/\/+$/, ''),
-          (template_code || '').trim(),
-          (invoice_series || '').trim(),
-          is_sandbox !== false,
-          (company_name || '').trim(),
-          (company_address || '').trim(),
-        ]
-      );
-      return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
-  // ── POST test ────────────────────────────────────────────────────────────
-  if (req.method === 'POST' && action === 'test') {
-    try {
-      const cfg = await getConfig();
-      if (!cfg?.username) {
-        return res.json({ success: false, message: 'Chưa có cấu hình Viettel' });
-      }
-      const { token, status, message } = await loginViettel(cfg);
-      if (!token) {
-        return res.json({
-          success: false,
-          message: `Đăng nhập thất bại (HTTP ${status}): ${message}`,
-        });
-      }
-      return res.json({
-        success: true,
-        message: `Kết nối thành công! Tài khoản: ${cfg.username} | MST: ${cfg.tax_code} | ${cfg.is_sandbox ? 'Sandbox' : 'Production'}`,
-        hasToken: true,
-      });
-    } catch (e: any) {
-      return res.json({ success: false, message: e.message });
-    }
-  }
-
-  // ── POST preview — Xem trước PDF (không lưu) ─────────────────────────────
-  if (req.method === 'POST' && action === 'preview') {
-    try {
-      const cfg = await getConfig();
-      if (!cfg?.username) {
-        return res.status(400).json({ error: 'Chưa có cấu hình Viettel' });
-      }
-
-      const { token, status: loginStatus, message: loginMsg } = await loginViettel(cfg);
-      if (!token) {
-        return res.status(401).json({
-          error: `Đăng nhập Viettel thất bại (HTTP ${loginStatus}): ${loginMsg}`,
-        });
-      }
-
-      const apiBase = getViettelApiBase(cfg);
-      const { transactionUuid, data: invoiceData } = buildViettelInvoicePayload(cfg, req.body || {});
-      const authHeaders = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Cookie: `access_token=${token}`,
-        Authorization: `Bearer ${token}`,
-      };
-
-      const r = await nodeRequest(
-        `${apiBase}/InvoiceUtilsWS/createInvoiceDraftPreview/${cfg.tax_code}`,
-        { method: 'POST', headers: authHeaders, body: JSON.stringify(invoiceData), timeoutMs: 30000 }
-      );
-
-      if (r.status >= 200 && r.status < 300) {
-        // safeJsonParse — tránh crash nếu server trả về HTML/text
-        const d = safeJsonParse(r.body);
-        if (d) {
-          const base64 = d.fileToBytes || d.pdfData || d.data || d.fileData || null;
-          if (base64) {
-            return res.json({ success: true, pdfBase64: base64, uuid: transactionUuid });
-          }
-          return res.json({ success: true, raw: d, uuid: transactionUuid });
-        }
-        // Body là raw binary/base64 thẳng
-        return res.json({
-          success: true,
-          pdfBase64: Buffer.from(r.body, 'binary').toString('base64'),
-          uuid: transactionUuid,
-        });
-      }
-
-      return res.status(r.status).json({
-        error: `HTTP ${r.status}`,
-        body: r.body.substring(0, 300),
-      });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
-  // ── POST create — Tạo hóa đơn nháp ─────────────────────────────────────
-  if (req.method === 'POST' && action === 'create') {
-    try {
-      const cfg = await getConfig();
-      if (!cfg?.username) {
-        return res.status(400).json({ error: 'Chưa có cấu hình Viettel' });
-      }
-
-      const { token, status: loginStatus, message: loginMsg } = await loginViettel(cfg);
-      if (!token) {
-        return res.status(401).json({
-          error: `Đăng nhập Viettel thất bại (HTTP ${loginStatus}): ${loginMsg}`,
-        });
-      }
-
-      const apiBase = getViettelApiBase(cfg);
-      const { transactionUuid, data: invoiceData } = buildViettelInvoicePayload(cfg, req.body || {});
-      const authHeaders = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Cookie: `access_token=${token}`,
-        Authorization: `Bearer ${token}`,
-      };
-
-      const endpoints = [
-        `${apiBase}/InvoiceWS/createOrUpdateInvoiceDraft/${cfg.tax_code}`,
-        `${apiBase}/InvoiceWS/createInvoiceDraft/${cfg.tax_code}`,
-      ];
-
-      const log: string[] = [];
-      for (const ep of endpoints) {
-        const r = await nodeRequest(ep, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(invoiceData),
-          timeoutMs: 75000,
-        });
-        const short = ep.replace(apiBase, '');
-        log.push(`POST ${short} → ${r.status}`);
-
-        if (r.status === 404 || r.status === 405) continue;
-        if (r.status === 401 || r.status === 403) {
-          return res.status(401).json({ error: 'Xác thực thất bại', log });
-        }
-
-        if (r.status >= 200 && r.status < 300) {
-          // safeJsonParse — tránh "Unexpected token 'A'" khi Viettel trả HTML lỗi
-          const d = safeJsonParse(r.body);
-          if (!d) {
-            return res.status(502).json({
-              error: `Viettel trả về phản hồi không hợp lệ (không phải JSON): ${r.body.substring(0, 200)}`,
-              log,
-            });
-          }
-          const ok = !d.errorCode || ['', '0', 'SUCCESS'].includes(String(d.errorCode));
-          if (ok) {
-            return res.json({
-              success: true,
-              invoiceNo: d.result?.invoiceNo || d.invoiceNo,
-              transactionUuid,
-              result: d.result || d,
-              log,
-            });
-          }
-          return res.status(422).json({
-            error: d.description || d.message || 'Viettel từ chối',
-            errorCode: d.errorCode,
-            log,
-          });
-        }
-
-        // Non-2xx — trả lỗi ngay, kèm body để debug
-        return res.status(r.status).json({
-          error: r.body.substring(0, 300),
-          log,
-        });
-      }
-
-      return res.status(500).json({
-        error: `Không kết nối được tới Viettel. Log: ${log.join(' | ')}`,
-      });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  }
-
-  // ── Fallback ─────────────────────────────────────────────────────────────
-  return res.status(400).json({
-    error: 'action không hợp lệ. Dùng: config, test, preview, create',
-  });
 }
