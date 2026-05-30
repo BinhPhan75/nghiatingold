@@ -1,4 +1,4 @@
-import { getViettelOrigin, loginViettel, requireAdmin, sendMethodNotAllowed } from './_viettel.js';
+import { loginViettel, requireAdmin, sendMethodNotAllowed } from './_viettel.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return sendMethodNotAllowed(res);
@@ -8,13 +8,12 @@ export default async function handler(req: any, res: any) {
   const { data: cfg, error } = await ctx.supabase
     .from('viettel_einvoice_config')
     .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(1)
+    .eq('id', '00000000-0000-0000-0000-000000000001')
     .maybeSingle();
+
   if (error) return res.status(500).json({ success: false, message: error.message });
-  if (!cfg) return res.status(400).json({ success: false, message: 'Chua co cau hinh Viettel.' });
-  if (!cfg.username || !cfg.password || !cfg.tax_code) {
-    return res.status(400).json({ success: false, message: 'Cau hinh chua day du tai khoan, mat khau hoac ma so thue.' });
+  if (!cfg || !cfg.username || !cfg.password) {
+    return res.status(400).json({ success: false, message: 'Dữ liệu cấu hình trống hoặc chưa được thiết lập.' });
   }
 
   try {
@@ -22,14 +21,11 @@ export default async function handler(req: any, res: any) {
     if (auth.token) {
       return res.json({
         success: true,
-        message: `Ket noi Viettel vInvoice thanh cong. Xac thuc Token OK. Tai khoan: ${cfg.username} | MST: ${cfg.tax_code} | Moi truong: Production`,
+        message: `Kết nối Viettel vInvoice thành công!\nTài khoản: ${cfg.username}\nMã số thuế: ${cfg.tax_code}\nMôi trường: ${cfg.is_sandbox ? 'Thử nghiệm (Sandbox)' : 'Chính thức (Production)'}`,
       });
     }
-    if (auth.status === 401 || auth.status === 403) {
-      return res.status(401).json({ success: false, message: `Sai tai khoan hoac mat khau (HTTP ${auth.status}).` });
-    }
-    return res.status(502).json({ success: false, message: `Dang nhap khong tra ve access_token (HTTP ${auth.status}). ${auth.message}`.trim() });
+    return res.status(401).json({ success: false, message: auth.error || 'Xác thực tài khoản với Viettel không thành công.' });
   } catch (err: any) {
-    return res.status(500).json({ success: false, message: `Khong ket noi duoc ${getViettelOrigin(cfg)}: ${err.message}` });
+    return res.status(500).json({ success: false, message: `Lỗi đường truyền mạng hệ thống: ${err.message}` });
   }
 }
