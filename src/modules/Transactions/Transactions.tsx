@@ -1126,10 +1126,10 @@ const Transactions: React.FC = () => {
               </div>
 
               <button 
-                onClick={resetForm} 
-                className="bg-ink text-paper w-full py-4 font-black uppercase text-[10px] tracking-widest hover:bg-gold-primary hover:text-ink transition-all border-t border-neutral-100"
+                onClick={() => { setShowQR(false); setShowSuccess(true); }} 
+                className="bg-gold-primary text-ink w-full py-4 font-black uppercase text-[10px] tracking-widest hover:bg-ink hover:text-white transition-all border-t border-neutral-100 flex items-center justify-center gap-2"
               >
-                Xác nhận & Đóng
+                <CheckCircle2 size={16} /> Xác nhận đã thanh toán → Xuất hóa đơn
               </button>
             </motion.div>
           ) : showInvoiceStep && invoiceData ? (
