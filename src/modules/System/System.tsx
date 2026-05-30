@@ -2,17 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product, SystemConfig, Profile, UserRole, UserStatus, Bank, ViettelEInvoiceConfig } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-<<<<<<< Updated upstream
-import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye } from 'lucide-react';
-=======
 import { Save, UserPlus, Users, Tag, Building2, ShieldCheck, Download, Upload, Plus, Trash2, X, XCircle, CheckCircle, UserCheck, Clock, FileText, RefreshCw, Eye, EyeOff } from 'lucide-react';
->>>>>>> Stashed changes
 import { formatCurrency } from '../../lib/utils';
 
 const System: React.FC = () => {
   const { profile, isAdmin, loading: authLoading } = useAuth();
-<<<<<<< Updated upstream
-  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'backup' | 'diagnostics' | 'veinvoice'>('prices');
+  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'einvoice' | 'backup' | 'diagnostics'>('prices');
   // Viettel eInvoice config state
   const [vConfig, setVConfig] = React.useState({
     username: '', password: '', tax_code: '', api_url: 'https://api-vinvoice.viettel.vn',
@@ -24,19 +19,12 @@ const System: React.FC = () => {
   const [vTesting, setVTesting] = React.useState(false);
   const [vShowPwd, setVShowPwd] = React.useState(false);
   const [vResult, setVResult] = React.useState<{ok: boolean; msg: string} | null>(null);
-=======
-  const [activeTab, setActiveTab] = useState<'prices' | 'users' | 'bank' | 'einvoice' | 'backup' | 'diagnostics'>('prices');
->>>>>>> Stashed changes
 
   const tabs = [
     { id: 'prices', label: 'Giá Vàng', roles: ['ADMIN', 'SALES'] },
     { id: 'users', label: 'Nhân Viên', roles: ['ADMIN'] },
     { id: 'bank', label: 'Ngân Hàng', roles: ['ADMIN'] },
-<<<<<<< Updated upstream
-    { id: 'veinvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
-=======
     { id: 'einvoice', label: 'Hóa Đơn ĐT', roles: ['ADMIN'] },
->>>>>>> Stashed changes
     { id: 'backup', label: 'Bảo Trì', roles: ['ADMIN'] },
     { id: 'diagnostics', label: 'Kiểm Tra Kết Nối', roles: ['ADMIN'] },
   ];
@@ -87,7 +75,7 @@ const System: React.FC = () => {
     if (isAdmin || activeTab === 'users') fetchProfiles();
     if (isAdmin && activeTab === 'einvoice') fetchViettelConfig();
     if (activeTab === 'diagnostics') checkConnection();
-    if (activeTab === 'veinvoice') loadVConfig();
+    if (isAdmin && activeTab === 'einvoice') fetchViettelConfig();
   }, [activeTab, isAdmin]);
 
   const getAuthHeaders = async () => {
@@ -1066,7 +1054,7 @@ const System: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'veinvoice' && (
+        {activeTab === 'einvoice' && (
           <div className="flex flex-col gap-6 max-w-2xl">
             <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
               <div className="flex items-center gap-3">

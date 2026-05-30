@@ -3,11 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Transaction, SystemConfig, Bank } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-<<<<<<< Updated upstream
 import { Camera, QrCode, CreditCard, Send, CheckCircle2, Search, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye } from 'lucide-react';
-=======
-import { Camera, QrCode, CreditCard, Send, CheckCircle2, ArrowLeftRight, X, XCircle, UserPlus, FileText, Eye, Loader2 } from 'lucide-react';
->>>>>>> Stashed changes
 import QRScanner from '../../components/QRScanner';
 import { parseCCCD, getVietQRUrl, formatCurrency, removeVietnameseTones, parseVietQR, generateEMVCoQR, getRawQRUrl } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,7 +11,6 @@ import { motion, AnimatePresence } from 'motion/react';
 const Transactions: React.FC = () => {
   const { profile, isAdmin, user } = useAuth();
   const [searchParams] = useSearchParams();
-  const { isAdmin } = useAuth();
   const initialType = searchParams.get('type') === 'BUY' ? 'BUY' : 'SELL';
   const [type, setType] = useState<'BUY' | 'SELL'>(initialType);
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,17 +52,11 @@ const Transactions: React.FC = () => {
   const [qrUrl, setQrUrl] = useState('');
   const [lastError, setLastError] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-<<<<<<< Updated upstream
   const [showInvoice, setShowInvoice] = useState(false);
   const [invoiceData, setInvoiceData] = useState<any>(null);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState<boolean|string|null>(false);
   const [invoiceResult, setInvoiceResult] = useState<any>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-=======
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [invoiceLoading, setInvoiceLoading] = useState<'preview' | 'draft' | null>(null);
-  const [invoiceResult, setInvoiceResult] = useState<any>(null);
->>>>>>> Stashed changes
 
   // Handheld Scanner Support
   const scanBuffer = React.useRef<string>('');
@@ -610,7 +599,7 @@ const Transactions: React.FC = () => {
       return;
     }
     setInvoiceResult(null);
-    setShowInvoiceModal(true);
+    setShowInvoice(true);
   };
 
   const submitViettelInvoice = async (mode: 'preview' | 'draft') => {
@@ -1259,7 +1248,7 @@ const Transactions: React.FC = () => {
               {/* Buttons */}
               <div className="flex gap-3 pt-2">
                 <button
-                  disabled={invoiceLoading}
+                  disabled={Boolean(invoiceLoading)}
                   onClick={async () => {
                     setInvoiceLoading(true); setInvoiceResult(null); setPdfUrl(null);
                     try {
@@ -1283,7 +1272,7 @@ const Transactions: React.FC = () => {
                   {invoiceLoading ? '...' : <><Eye size={14} /> Xem trước</>}
                 </button>
                 <button
-                  disabled={invoiceLoading}
+                  disabled={Boolean(invoiceLoading)}
                   onClick={async () => {
                     setInvoiceLoading(true); setInvoiceResult(null);
                     try {
