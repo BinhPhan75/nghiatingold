@@ -42,21 +42,26 @@ export default async function handler(req: any, res: any) {
     }
 
     const baseUrl = (cfg.api_url || 'https://api-vinvoice.viettel.vn').replace(/\/+$/, '');
-    const loginRes = await nodeRequest(`${baseUrl}/InvoiceAPI/InvoiceWS/login`, {
+    const loginRes = await nodeRequest(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ username: cfg.username, password: cfg.password }),
     });
 
-    const data = JSON.parse(loginRes.body || '{}');
-    if (loginRes.status === 200 && data.token) {
+    // safeJsonParse: tránh crash nếu Viettel trả HTML thay JSON
+    let data: any = {};
+    try { data = JSON.parse(loginRes.body || '{}'); } catch { data = {}; }
+
+    const token = data.access_token || data.token || data.accessToken || '';
+    if (loginRes.status === 200 && token) {
       return res.json({
         success: true,
-        message: `Đã kết nối mượt mà đến Viettel vInvoice! Hệ thống ghi nhận MST doanh nghiệp: ${cfg.tax_code}`,
+        message: `Kết nối Viettel vInvoice thành công! MST: ${cfg.tax_code} | ${cfg.is_sandbox ? 'Sandbox' : 'Production'}`,
       });
     }
 
-    return res.status(401).json({ success: false, message: data.description || 'Tài khoản hoặc mật khẩu kết nối Viettel không khớp.' });
+    const errMsg = data.description || data.message || data.error || `HTTP ${loginRes.status}`;
+    return res.status(401).json({ success: false, message: `Sai tài khoản hoặc mật khẩu Viettel: ${errMsg}` });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }

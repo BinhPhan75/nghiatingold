@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { buildViettelInvoicePayload, getViettelApiBase, loginViettel, nodeRequest, requireAdmin, sendMethodNotAllowed } from './_viettel.js';
+import { buildViettelInvoicePayload, getViettelApiBase, loginViettel, nodeRequest, requireAdmin, sendMethodNotAllowed } from './_viettel';
 
 function getFallbackSupabase() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';

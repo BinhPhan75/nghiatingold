@@ -15,7 +15,7 @@ export function sendMethodNotAllowed(res: any) {
   return res.status(405).json({ errorCode: 'METHOD_NOT_ALLOWED', description: 'Phương thức không được hỗ trợ.' });
 }
 
-export async export function requireAdmin(req: any, res: any) {
+export async function requireAdmin(req: any, res: any) {
   if (!supabaseUrl || !supabaseAnonKey) {
     res.status(500).json({ errorCode: 'SUPABASE_NOT_CONFIGURED', description: 'Hệ thống Server thiếu biến môi trường Supabase.' });
     return null;
@@ -122,7 +122,7 @@ export function extractViettelAccessToken(data: any): string {
   );
 }
 
-export async export function loginViettel(cfg: any): Promise<{ token: string; status: number; message: string }> {
+export async function loginViettel(cfg: any): Promise<{ token: string; status: number; message: string }> {
   const loginRes = await nodeRequest(`${getViettelOrigin(cfg)}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

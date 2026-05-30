@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/api/viettel", "destination": "/api/viettel" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/viettel-config",  "destination": "/api/viettel-config"  },
+    { "source": "/api/viettel-test",    "destination": "/api/viettel-test"    },
+    { "source": "/api/viettel-invoice", "destination": "/api/viettel-invoice" },
+    { "source": "/(.*)",                "destination": "/index.html"           }
   ]
 }
