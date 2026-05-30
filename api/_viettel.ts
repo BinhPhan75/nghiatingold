@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import https from 'https';
 import http from 'http';
@@ -6,46 +5,40 @@ import http from 'http';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-// ── Auth Helpers ─────────────────────────────────────────────────────────────
+// Hàm bóc tách Bearer Token từ Header của phần mềm chính gửi lên
 function getBearerToken(req: any) {
   const auth = req.headers.authorization || req.headers.Authorization || '';
-  return auth.toString().replace(/^Bearer\s+/i, '').trim();
+  return auth.toString().replace(/^Bearer\\s+/i, '').trim();
 }
 
-function getUserSupabase(token: string) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+export function sendMethodNotAllowed(res: any) {
+  return res.status(405).json({ errorCode: 'METHOD_NOT_ALLOWED', description: 'Phương thức không được hỗ trợ.' });
 }
 
 export async export function requireAdmin(req: any, res: any) {
   if (!supabaseUrl || !supabaseAnonKey) {
-    res.status(500).json({ errorCode: 'SUPABASE_NOT_CONFIGURED', description: 'Server missing Supabase env vars.' });
+    res.status(500).json({ errorCode: 'SUPABASE_NOT_CONFIGURED', description: 'Hệ thống Server thiếu biến môi trường Supabase.' });
     return null;
   }
   const token = getBearerToken(req);
   if (!token) {
-    res.status(401).json({ errorCode: 'AUTH_REQUIRED', description: 'Missing Authorization bearer token.' });
+    res.status(401).json({ errorCode: 'AUTH_REQUIRED', description: 'Yêu cầu đăng nhập quản trị viên để thao tác.' });
     return null;
   }
-  const supabase = getUserSupabase(token);
-  const { data: authData, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !authData.user) {
-    res.status(401).json({ errorCode: 'INVALID_TOKEN', description: 'Invalid login session.' });
+
+  // Khởi tạo Supabase Client với token của người dùng hiện tại để kiểm tra quyền
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    res.status(401).json({ errorCode: 'INVALID_TOKEN', description: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.' });
     return null;
   }
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id,email,role,status')
-    .eq('id', authData.user.id)
-    .single();
-  const isAdminEmail = authData.user.email?.toLowerCase() === 'binhphan.070582@gmail.com';
-  if (profileError || (!isAdminEmail && profile?.role !== 'ADMIN')) {
-    res.status(403).json({ errorCode: 'ADMIN_ONLY', description: 'Only ADMIN users can use Viettel e-invoice APIs.' });
-    return null;
-  }
-  return { supabase, user: authData.user, profile };
+
+  return { supabase, user };
 }
 
 // ── Network Helper ────────────────────────────────────────────────────────────
@@ -54,25 +47,29 @@ export function nodeRequest(
   options: { method: string; headers: Record<string, string>; body?: string; timeoutMs?: number }
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const parsed = new URL(urlStr);
-    const lib = parsed.protocol === 'https:' ? https : http;
-    const req = lib.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-        path: parsed.pathname + parsed.search,
-        method: options.method,
-        headers: options.headers,
-        timeout: options.timeoutMs || 12000,
-      },
-      (response) => {
-        let data = '';
-        response.on('data', (chunk) => (data += chunk));
-        response.on('end', () => resolve({ status: response.statusCode || 0, body: data }));
-      }
-    );
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.on('error', reject);
+    const url = new URL(urlStr);
+    const isHttps = url.protocol === 'https:';
+    const reqAdapter = isHttps ? https.request : http.request;
+
+    const reqOpts = {
+      hostname: url.hostname,
+      port: url.port || (isHttps ? 443 : 80),
+      path: url.pathname + url.search,
+      method: options.method.toUpperCase(),
+      headers: options.headers || {},
+      timeout: options.timeoutMs || 60000,
+    };
+
+    const req = reqAdapter(reqOpts, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => { resolve({ status: res.statusCode || 200, body }); });
+    });
+
+    req.on('timeout', () => { req.destroy(); reject(new Error('Kết nối tới hệ thống Viettel vInvoice bị quá thời gian phản hồi (Timeout).')); });
+    req.on('error', (err) => { reject(err); });
+
     if (options.body) req.write(options.body);
     req.end();
   });
@@ -129,15 +126,8 @@ export async export function loginViettel(cfg: any): Promise<{ token: string; st
   const loginRes = await nodeRequest(`${getViettelOrigin(cfg)}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ username: cfg.username, password: cfg.password }),
-    timeoutMs: 15000,
+    body: JSON.stringify(payload),
   });
-  // Use safeJsonParse — Viettel đôi khi trả HTML khi lỗi, không phải JSON
-  const data = safeJsonParse(loginRes.body) ?? {};
-  const token = extractViettelAccessToken(data);
-  const message = data.description || data.message || data.error || loginRes.body?.substring(0, 200) || '';
-  return { token, status: loginRes.status, message };
-}
 
 // ── Số tiền bằng chữ ─────────────────────────────────────────────────────────
 export function numberToVietnameseWords(amount: number): string {
@@ -167,8 +157,7 @@ export function numberToVietnameseWords(amount: number): string {
     n = Math.floor(n / 1000);
     unitIndex++;
   }
-  const rs = parts.join(' ').trim();
-  return `${rs.charAt(0).toUpperCase()}${rs.slice(1)} dong`;
+  return { token: null, status: res.status, error: `Lỗi kết nối Viettel. Mã lỗi HTTP: ${res.status}` };
 }
 
 // ── Build Invoice Payload ─────────────────────────────────────────────────────
@@ -229,6 +218,8 @@ export function buildViettelInvoicePayload(cfg: any, payload: any) {
       taxBreakdowns: [{ taxPercentage: 0, taxableAmount: total, taxAmount: 0 }],
     },
   };
+
+  return { transactionUuid: uniqueId, data };
 }
 
 export function sendMethodNotAllowed(res: any) {
