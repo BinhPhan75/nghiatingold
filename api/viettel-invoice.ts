@@ -6,61 +6,54 @@ export default async function handler(req: any, res: any) {
   if (!ctx) return;
 
   const { mode, payload } = req.body || {};
-  if (!payload) return res.status(400).json({ errorCode: 'PAYLOAD_REQUIRED', description: 'Thieu du lieu hoa don.' });
+  if (!payload) return res.status(400).json({ errorCode: 'PAYLOAD_REQUIRED', description: 'Thiếu dữ liệu chi tiết đơn hàng.' });
   if (mode !== 'preview' && mode !== 'draft') {
-    return res.status(400).json({ errorCode: 'MODE_REQUIRED', description: 'mode phai la preview hoac draft.' });
+    return res.status(400).json({ errorCode: 'MODE_REQUIRED', description: 'Chế độ (mode) bắt buộc là preview hoặc draft.' });
   }
 
   const { data: cfg, error } = await ctx.supabase
     .from('viettel_einvoice_config')
     .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(1)
+    .eq('id', '00000000-0000-0000-0000-000000000001')
     .maybeSingle();
-  if (error) return res.status(500).json({ errorCode: 'CONFIG_READ_FAILED', description: error.message });
-  if (!cfg) return res.status(400).json({ errorCode: 'NO_CONFIG', description: 'Chua co cau hinh Viettel.' });
-  if (!cfg.company_name) return res.status(400).json({ errorCode: 'SELLER_LEGAL_NAME_REQUIRED', description: 'Vui long nhap Ten doanh nghiep trong Cau hinh hoa don dien tu.' });
 
+  if (error) return res.status(500).json({ errorCode: 'CONFIG_READ_FAILED', description: error.message });
+  if (!cfg) return res.status(400).json({ errorCode: 'NO_CONFIG', description: 'Vui lòng hoàn thành Cấu hình Viettel trước khi lập hóa đơn.' });
+
+  // Thực hiện login lấy cookie session của Viettel
   const auth = await loginViettel(cfg);
   if (!auth.token) {
-    if (auth.status === 401 || auth.status === 403) return res.status(401).json({ errorCode: 'AUTH_FAILED', description: 'Dang nhap Viettel that bai. Vui long kiem tra username/password.' });
-    return res.status(502).json({ errorCode: 'TOKEN_FAILED', description: `Dang nhap Viettel khong tra ve access_token (HTTP ${auth.status}). ${auth.message}`.trim() });
+    return res.status(401).json({ errorCode: 'VIETTEL_AUTH_FAILED', description: auth.error || 'Đăng nhập cổng hóa đơn Viettel thất bại.' });
   }
 
   const built = buildViettelInvoicePayload(cfg, payload);
   const apiBase = getViettelApiBase(cfg);
+
+  // Chọn endpoint chuẩn tùy vào nhu cầu xem trước hay lưu nháp
   const endpoint = mode === 'preview'
-    ? `${apiBase}/InvoiceAPI/InvoiceUtilsWS/createInvoiceDraftPreview/${encodeURIComponent(cfg.tax_code)}`
+    ? `${apiBase}/InvoiceAPI/InvoiceWS/createInvoiceDraftPreview/${encodeURIComponent(cfg.tax_code)}`
     : `${apiBase}/InvoiceAPI/InvoiceWS/createOrUpdateInvoiceDraft/${encodeURIComponent(cfg.tax_code)}`;
 
-  const response = await nodeRequest(endpoint, {
-    method: 'POST',
-    headers: { Cookie: `access_token=${auth.token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(built.data),
-    timeoutMs: 75000,
-  });
-  if (response.status === 401 || response.status === 403) {
-    return res.status(401).json({ errorCode: 'AUTH_FAILED', description: 'Xac thuc Viettel that bai.' });
-  }
-
-  let data: any = {};
-  try { data = JSON.parse(response.body || '{}'); }
-  catch {
-    return res.status(response.status >= 400 ? response.status : 502).json({
-      errorCode: 'INVALID_RESPONSE',
-      description: response.body?.substring(0, 500) || 'Viettel tra ve du lieu khong phai JSON.',
+  try {
+    const response = await nodeRequest(endpoint, {
+      method: 'POST',
+      headers: { Cookie: `access_token=${auth.token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(built.data),
+      timeoutMs: 75000,
     });
-  }
 
-  if (response.status >= 200 && response.status < 300) {
-    const ok = !data.errorCode || ['', '0', 'SUCCESS'].includes(String(data.errorCode));
-    if (ok) return res.json({ ...data, mode, transactionUuid: built.transactionUuid });
-    return res.status(422).json({ errorCode: data.errorCode, description: data.description || 'Viettel tu choi du lieu hoa don.', raw: data });
-  }
+    let data: any = {};
+    try { data = JSON.parse(response.body || '{}'); } catch {
+      return res.status(502).json({ errorCode: 'INVALID_JSON', description: 'Phản hồi từ Viettel không đúng cấu trúc chuẩn.' });
+    }
 
-  return res.status(response.status).json({
-    errorCode: data.errorCode || `HTTP_${response.status}`,
-    description: data.description || data.message || response.body?.substring(0, 500),
-    raw: data,
-  });
+    if (response.status >= 200 && response.status < 300) {
+      const ok = !data.errorCode || ['', '0', 'SUCCESS'].includes(String(data.errorCode));
+      if (ok) return res.json({ ...data, mode, transactionUuid: built.transactionUuid });
+      return res.status(422).json({ errorCode: data.errorCode, description: data.description || 'Dữ liệu bị Viettel từ chối.', raw: data });
+    }
+    return res.status(response.status).json({ errorCode: `HTTP_${response.status}`, description: `Lỗi kết nối Viettel (${response.status})` });
+  } catch (err: any) {
+    return res.status(500).json({ errorCode: 'SERVER_ERROR', description: err.message });
+  }
 }
