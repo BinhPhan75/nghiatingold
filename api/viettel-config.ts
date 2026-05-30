@@ -1,4 +1,4 @@
-import { requireAdmin, sendMethodNotAllowed } from './_viettel';
+import { requireAdmin, sendMethodNotAllowed } from './_viettel.js';
 
 const CONFIG_ID = '00000000-0000-0000-0000-000000000001';
 

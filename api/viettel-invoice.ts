@@ -1,4 +1,4 @@
-import { buildViettelInvoicePayload, getViettelApiBase, loginViettel, nodeRequest, requireAdmin, sendMethodNotAllowed } from './_viettel';
+import { buildViettelInvoicePayload, getViettelApiBase, loginViettel, nodeRequest, requireAdmin, sendMethodNotAllowed } from './_viettel.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return sendMethodNotAllowed(res);
